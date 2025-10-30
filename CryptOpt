@@ -26,6 +26,9 @@ INSTALLDIR="$(dirname "${0}")"
 cd "${INSTALLDIR}"
 
 #run
-PATH="$(realpath ./bins/node/bin):${PATH}" \
-  /usr/bin/env node \
-  "./dist/CryptOpt.js" "${@}"
+# PATH="$(realpath ./bins/node/bin):${PATH}" \
+#   /usr/bin/env node \
+#   "./dist/CryptOpt.js" "${@}"
+#
+#run
+node ./dist/CryptOpt.js "${@}"

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import type { SpyInstance } from "vitest";
+import type { MockInstance } from "vitest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { Optimizer } from "@/optimizer";
@@ -22,8 +22,8 @@ import { Optimizer } from "@/optimizer";
 import { getTestArgs } from "./test-helpers";
 
 describe("full tests fiat", () => {
-  let mockLog: SpyInstance;
-  let mockErr: SpyInstance;
+  let mockLog: MockInstance;
+  let mockErr: MockInstance;
   beforeAll(() => {
     const dofkall = (_msg: string) => {
       /*intentionally empty*/

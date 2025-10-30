@@ -15,7 +15,7 @@
  */
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import type { SpyInstance } from "vitest";
+import type { MockInstance } from "vitest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -31,7 +31,7 @@ import { bitwiseOp } from "@/instructionGeneration/bitwiseOps";
 import { Paul } from "@/paul";
 import type { AllocationReq, Allocations, CryptOpt } from "@/types";
 
-let paulChooseAndSpy: SpyInstance;
+let paulChooseAndSpy: MockInstance;
 const allocate = vi.fn();
 const getCurrentAllocations = vi.fn();
 const declare128 = vi.fn();

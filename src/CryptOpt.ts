@@ -33,7 +33,7 @@ import {
 } from "@/helper";
 import { registerExitHooks } from "@/helper/process";
 import { Model } from "@/model";
-import { Optimizer } from "@/optimizer";
+import { OptimizerFactory, Optimizer } from "@/optimizer";
 import { sha1Hash } from "@/paul";
 import type { CryptOpt, CryptoptGlobals, OptimizerArgs } from "@/types";
 
@@ -41,7 +41,7 @@ import Logger from "./helper/Logger.class";
 
 let parsedArgs = parsedArgsFromCli;
 if (parsedArgs.startFromBestJson) {
-  const symbolname = new Optimizer(parsedArgs).getSymbolname(true);
+  const symbolname = OptimizerFactory.make(parsedArgs).getSymbolname(true);
   const dir = resolve(parsedArgs.resultDir, parsedArgs.bridge, symbolname);
   if (parsedArgs.verbose) {
     console.log(`Checking '${dir}' for the abosulte bestestest Statefile.`);
@@ -94,7 +94,7 @@ if (!verbose) {
 //         1          |          1         | many(!) debug msg while running, and not in asm
 
 // to get the symbol name, we create new anonymous optimizer.
-const symbolname = new Optimizer(parsedArgs).getSymbolname(true);
+const symbolname = OptimizerFactory.make(parsedArgs).getSymbolname(true);
 registerExitHooks({ ...parsedArgs, symbolname });
 
 type RunResult = { statefile: string; ratio: number; convergence: string[] };
@@ -133,7 +133,7 @@ async function allBets(evals: number, bets: number): Promise<RunResult[]> {
 async function run(args: OptimizerArgs): Promise<RunResult> {
   let optimizer: Optimizer;
   try {
-    optimizer = new Optimizer(args);
+    optimizer = OptimizerFactory.make(args);
   } catch (e) {
     console.error(`CryptOpt-Error while creating the optimizer\n`, e);
     process.exit(1000);
@@ -145,7 +145,7 @@ async function run(args: OptimizerArgs): Promise<RunResult> {
     process.exit(1000);
   }
 
-  const [statefile] = generateResultFilename({ ...args, symbolname: optimizer.getSymbolname() });
+  const [statefile] = generateResultFilename({ ...args, symbolname: optimizer.getSymbolname(false) });
   Model.persist(statefile, parsedArgs);
   const { ratio, convergence } = Model.getState();
   return { statefile, ratio, convergence };

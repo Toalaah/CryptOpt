@@ -17,13 +17,14 @@
 import { BRIDGES_T } from "@/bridge";
 import { METHOD_T } from "@/bridge/bitcoin-core-bridge";
 import { CURVE_T } from "@/bridge/fiat-bridge";
-import { FRAME_POINTER_OPTIONS_T, MEMORY_CONSTRAINTS_OPTIONS_T } from "@/types";
+import { FRAME_POINTER_OPTIONS_T, MEMORY_CONSTRAINTS_OPTIONS_T, OPTIMIZER_STRATEGY_T } from "@/types";
 
 export type OptimizerArgs = {
   evals: number;
   seed: number;
   curve: CURVE_T;
   method: METHOD_T;
+  optimizer: OPTIMIZER_STRATEGY_T;
   cyclegoal: number;
   readState?: string; // filename
   logComment: string;

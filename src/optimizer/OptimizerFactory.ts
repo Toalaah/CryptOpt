@@ -14,4 +14,24 @@
  * limitations under the License.
  */
 
-export * from "./OptimizerFactory";
+import { OptimizerArgs } from "@/types";
+import { RLSOptimizer } from "@/optimizer/rls";
+import { SAOptimizer } from "@/optimizer/sa";
+
+export interface Optimizer {
+  getSymbolname(deleteCache: boolean): string;
+  optimise(): Promise<number>;
+}
+
+export class OptimizerFactory {
+  public static make(args: OptimizerArgs): Optimizer {
+    switch (args.optimizer) {
+      case "rls":
+        return new RLSOptimizer(args);
+      case "sa":
+        return new SAOptimizer(args);
+      default:
+        throw new Error(`unknown optimizer strategy: ${args.optimizer}`);
+    }
+  }
+}

@@ -17,7 +17,7 @@
 import { basename } from "path";
 import { afterAll, expect, it, vi } from "vitest";
 
-import { Optimizer } from "@/optimizer";
+import { RLSOptimizer } from "@/optimizer";
 
 import { getTestArgs, nothing } from "../test-helpers";
 
@@ -31,7 +31,7 @@ it("optimise", () => {
     const filename = basename(import.meta.url);
     const args = getTestArgs(filename);
     args.memoryConstraints = "out1-arg1";
-    const opt = new Optimizer(args);
+    const opt = new RLSOptimizer(args);
 
     try {
       expect(() =>

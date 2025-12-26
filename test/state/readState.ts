@@ -19,7 +19,7 @@ import { dirname, resolve as pathResolve } from "path";
 import { fileURLToPath } from "url";
 import { afterAll, expect, it, vi } from "vitest";
 
-import { Optimizer } from "@/optimizer";
+import { RLSOptimizer } from "@/optimizer";
 
 import { getTestResultsPath, nothing } from "../test-helpers";
 
@@ -40,7 +40,7 @@ it("optimise", () => {
     args.resultDir = getTestResultsPath();
     args.readState = statefile;
     expect(args).toBeTruthy();
-    const opt = new Optimizer(args);
+    const opt = new RLSOptimizer(args);
 
     try {
       expect(() =>

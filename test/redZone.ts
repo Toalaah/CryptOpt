@@ -19,7 +19,7 @@ import { afterAll, expect, it, describe, vi } from "vitest";
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { resolve as pathResolve } from "path";
 
-import { Optimizer } from "@/optimizer";
+import { RLSOptimizer } from "@/optimizer";
 
 import { getTestArgs, nothing } from "./test-helpers";
 
@@ -35,7 +35,7 @@ describe("check usage of redzone", () => {
       const args = getTestArgs(filename);
       args.redzone = true;
       args.resultDir = pathResolve(args.resultDir, `${Date.now().toString()}-${args.redzone}`);
-      const opt = new Optimizer(args);
+      const opt = new RLSOptimizer(args);
 
       try {
         expect(() =>
@@ -77,7 +77,7 @@ describe("check usage of redzone", () => {
       const args = getTestArgs(filename);
       args.redzone = false;
       args.resultDir = pathResolve(args.resultDir, `${Date.now().toString()}-${args.redzone}`);
-      const opt = new Optimizer(args);
+      const opt = new RLSOptimizer(args);
 
       try {
         expect(() =>

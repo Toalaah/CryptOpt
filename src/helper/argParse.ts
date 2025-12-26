@@ -30,9 +30,15 @@ import {
 } from "@/bridge/fiat-bridge/constants";
 import { errorOut, ERRORS } from "@/errors";
 
-import { FRAME_POINTER_OPTIONS, MEMORY_CONSTRAINTS_OPTIONS, ParsedArgsT } from "../types";
+import {
+  FRAME_POINTER_OPTIONS,
+  MEMORY_CONSTRAINTS_OPTIONS,
+  ParsedArgsT,
+  OPTIMIZER_STRATEGIES,
+  OPTIMIZER_STRATEGY_RLS,
+} from "@/types";
 
-const y = await yargs(process.argv.slice(2));
+const y = yargs(process.argv.slice(2));
 
 export const parsedArgs = y
   .scriptName("./CryptOpt")
@@ -50,6 +56,13 @@ export const parsedArgs = y
     default: "square",
     describe: "Method to optimise on.",
     choices: uniq(FIAT_METHODS.concat(BITCOIN_CORE_METHODS)),
+  })
+  .option("optimizer", {
+    string: true,
+    alias: "o",
+    default: OPTIMIZER_STRATEGY_RLS,
+    describe: "Optimizer strategy to use.",
+    choices: OPTIMIZER_STRATEGIES,
   })
   .option("bridge", {
     string: true,

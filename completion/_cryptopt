@@ -17,6 +17,7 @@
 
 _arguments -S -s \
     '(--bridge)--bridge=[Bridge]:bridge:->bridges' \
+    '(-o --optimizer)'{-o=,-optimizer=}'[Optimizer strategy to use]:optimizer:->optimizers' \
     '(-c --curve -j --jsonFile -f --cFile)'{-c,--curve=}'[Curve]:curve:->curves' \
     '(-m --method -j --jsonFile -f --cFile)'{-m,--method=}'[Method]:method:->methods' \
     '(-j --jsonFile -c --curve -m --method)'{-j,--jsonFile=}'[JSON-CODE, must --bridge manual]:json:_files -g \*.json' \
@@ -40,13 +41,18 @@ _arguments -S -s \
     '(-h,--help)'{-h,--help}'[Help]:get help prompt' \
     '(--version)'{-v,--version}'[Version]:Version information' \
     && ret=0
-case "$state" in 
+case "$state" in
 	bridges)
 		_values  'bridge' \
 			'fiat[Fiat Bridge]' \
 			'bitcoin-core[Bitcoin Core Bridge (must specify -c secp256k1)]' \
 			'jasmin[Jasmin Bridge, experimental and currenly only supports the curve25519-add_double4 method]' \
 			'manual[Manual Bridge (must specify -j and -f)]' \
+		;;
+	optimizers)
+		_values  'optimizer' \
+			'rls[Random Local Search]' \
+			'sa[Simulated Annealing]' \
 		;;
 	methods)
 		_values  'method' \

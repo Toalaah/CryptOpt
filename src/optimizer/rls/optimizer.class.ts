@@ -41,16 +41,17 @@ import { Paul, sha1Hash } from "@/paul";
 import { RegisterAllocator } from "@/registerAllocator";
 import type { AnalyseResult, OptimizerArgs } from "@/types";
 
-import { genStatistics, genStatusLine, logMutation, printStartInfo } from "./optimizer.helper";
+import { genStatistics, genStatusLine, logMutation, printStartInfo } from "../util";
 import { init } from "./optimizer.helper.class";
+import { Optimizer } from "../OptimizerFactory";
 
 let choice: CHOICE;
 
-export class Optimizer {
+export class RLSOptimizer implements Optimizer {
   private measuresuite: Measuresuite;
   private libcheckfunctionDirectory: string; // aka. /tmp/CryptOpt.cache/yolo123
   private symbolname: string;
-  public getSymbolname(deleteCache = false): string {
+  public getSymbolname(deleteCache: boolean): string {
     if (deleteCache) {
       this.cleanLibcheckfunctions();
     }

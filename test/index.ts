@@ -17,7 +17,7 @@
 import type { MockInstance } from "vitest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { Optimizer } from "@/optimizer";
+import { RLSOptimizer } from "@/optimizer";
 
 import { getTestArgs } from "./test-helpers";
 
@@ -44,11 +44,11 @@ describe("full tests fiat", () => {
 
   it("should only throw on invalid curves.", () => {
     expect(() => {
-      new Optimizer(args);
+      new RLSOptimizer(args);
     }).not.toThrow();
 
     expect(() => {
-      new Optimizer(Object.assign({}, args, { curve: "INVALIDCURVE", method: "square" }));
+      new RLSOptimizer(Object.assign({}, args, { curve: "INVALIDCURVE", method: "square" }));
     }).toThrow(/Cannot destructure property '.*' of '.*' as it is undefined./);
   });
 

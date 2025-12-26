@@ -32,6 +32,11 @@ export type FRAME_POINTER_OPTIONS_T = (typeof FRAME_POINTER_OPTIONS)[number];
 export const MEMORY_CONSTRAINTS_OPTIONS = ["none", "all", "out1-arg1"] as const;
 export type MEMORY_CONSTRAINTS_OPTIONS_T = (typeof MEMORY_CONSTRAINTS_OPTIONS)[number];
 
+export const OPTIMIZER_STRATEGY_RLS = "rls";
+export const OPTIMIZER_STRATEGY_SA = "sa";
+export const OPTIMIZER_STRATEGIES = [OPTIMIZER_STRATEGY_RLS, OPTIMIZER_STRATEGY_SA] as const;
+export type OPTIMIZER_STRATEGY_T = (typeof OPTIMIZER_STRATEGIES)[number];
+
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace CryptOpt {
   export type StateFile = {

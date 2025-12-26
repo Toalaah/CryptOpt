@@ -17,7 +17,7 @@
 import { basename } from "path";
 import { afterAll, expect, it, vi } from "vitest";
 
-import { Optimizer } from "@/optimizer";
+import { RLSOptimizer } from "@/optimizer";
 
 import { getTestArgs, nothing } from "../test-helpers";
 
@@ -30,7 +30,7 @@ it("optimise", () => {
   return new Promise((resolve, reject) => {
     const filename = basename(import.meta.url);
     const args = getTestArgs(filename);
-    const opt = new Optimizer(args);
+    const opt = new RLSOptimizer(args);
 
     try {
       expect(() =>

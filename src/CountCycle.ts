@@ -42,7 +42,7 @@ import * as Stats from "simple-statistics";
 
 import { KNOWN_SYMBOLS } from "@/bridge";
 import { analyseRow, CONF_IDX, ttable } from "@/helper";
-import { init } from "@/optimizer/optimizer.helper.class";
+import { init } from "@/optimizer/rls/optimizer.helper.class";
 import { sha1Hash } from "@/paul";
 
 // this number specifies how many data points are in each sample.

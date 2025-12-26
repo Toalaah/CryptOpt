@@ -17,7 +17,7 @@
 import { basename } from "path";
 import { afterAll, expect, it, vi } from "vitest";
 
-import { RLSOptimizer } from "@/optimizer";
+import { OptimizerFactory } from "@/optimizer";
 
 import { getTestArgs, nothing } from "../test-helpers";
 
@@ -31,7 +31,7 @@ it("optimise", () => {
     const filename = basename(import.meta.url);
     const args = getTestArgs(filename);
     args.bridge = "bitcoin-core";
-    const opt = new RLSOptimizer(args);
+    const opt = OptimizerFactory.make(args);
 
     try {
       expect(() =>

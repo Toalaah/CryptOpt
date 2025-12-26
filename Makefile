@@ -44,11 +44,11 @@ $(FIAT_CHECKSUMS): $(addprefix $(FIAT_DATA_DIR)/, $(FIAT_BINARIES))
 
 $(BUILT_CRYPTOPT): node_modules $(shell find ./src -type f -name '*ts') $(FIAT_CHECKSUMS)
 	@echo "Building CryptOpt"
-	@PATH=$(PATH) npm run bundle
+	@PATH=$(PATH) bun run build.ts
 	@test -e "$(@)" && touch $(@) && echo "Successfully built CryptOpt. :)"
 
 check: $(BUILT_CRYPTOPT)
-	PATH=$(PATH) npm run test-no-watch
+	PATH=$(PATH) bun run test-no-watch
 
 clean:
 	@rm -rf ./dist ./coverage ./bundle.tar.gz ./bundle.zip
@@ -71,7 +71,7 @@ bundle.zip: $(BUNDLE_FILES)
 
 jasmin: $(BUILT_CRYPTOPT)
 	clear
-	./CryptOpt --bridge jasmin --verbose  --seed 123456
+	./CryptOpt --bridge jasmin --verbose --seed 123456
 
 watch: node_modules
 	@PATH=$(PATH) DEBUG=1 npm run bundle-w

@@ -37,38 +37,18 @@ import {
 import globals from "@/helper/globals";
 import Logger from "@/helper/Logger.class";
 import { Model } from "@/model";
-import { Paul, sha1Hash } from "@/paul";
 import { RegisterAllocator } from "@/registerAllocator";
 import type { AnalyseResult, OptimizerArgs } from "@/types";
 
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "../util";
-import { init } from "@/optimizer/helpers";
-import { Optimizer } from "../OptimizerFactory";
+import { Optimizer } from "@/optimizer";
+import { Paul } from "@/paul";
 
 let choice: CHOICE;
 
-export class RLSOptimizer implements Optimizer {
-  private measuresuite: Measuresuite;
-  private libcheckfunctionDirectory: string; // aka. /tmp/CryptOpt.cache/yolo123
-  private symbolname: string;
-  public getSymbolname(deleteCache: boolean): string {
-    if (deleteCache) {
-      this.cleanLibcheckfunctions();
-    }
-    return this.symbolname;
-  }
-
-  public constructor(private args: OptimizerArgs) {
-    Paul.seed = args.seed;
-
-    const randomString = sha1Hash(Math.ceil(Date.now() * Math.random())).toString(36);
-    this.libcheckfunctionDirectory = join(tmpdir(), "CryptOpt.cache", randomString);
-
-    const { measuresuite, symbolname } = init(this.libcheckfunctionDirectory, args);
-
-    this.measuresuite = measuresuite;
-    this.symbolname = symbolname;
-
+export class RLSOptimizer extends Optimizer {
+  public constructor(args: OptimizerArgs) {
+    super(args);
     globals.convergence = [];
     globals.mutationLog = [
       "evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
@@ -399,18 +379,5 @@ export class RLSOptimizer implements Optimizer {
         }
       }, 0);
     });
-  }
-
-  private cleanLibcheckfunctions() {
-    if (existsSync(this.libcheckfunctionDirectory)) {
-      try {
-        Logger.log(`Removing lib check functions in '${this.libcheckfunctionDirectory}'`);
-        rmSync(this.libcheckfunctionDirectory, { recursive: true });
-        Logger.log(`removed ${this.libcheckfunctionDirectory}`);
-      } catch (e) {
-        console.error(e);
-        throw e;
-      }
-    }
   }
 }

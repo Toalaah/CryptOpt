@@ -18,7 +18,7 @@ import { existsSync, readdirSync, readFileSync } from "fs";
 import { basename, resolve as pathResolve } from "path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-import { RLSOptimizer } from "@/optimizer";
+import { OptimizerFactory } from "@/optimizer";
 
 import { getTestArgs, nothing } from "./test-helpers";
 
@@ -34,7 +34,7 @@ describe("check usage of rbp (framepointer)", () => {
       const args = getTestArgs(filename);
       args.framePointer = "omit";
       args.resultDir = pathResolve(args.resultDir, `${Date.now().toString()}-${args.framePointer}`);
-      const opt = new RLSOptimizer(args);
+      const opt = OptimizerFactory.make(args);
 
       try {
         expect(() =>
@@ -68,7 +68,7 @@ describe("check usage of rbp (framepointer)", () => {
       const filename = basename("p434-mul.ts"); // just to have a long function
       const args = getTestArgs(filename);
       args.resultDir = pathResolve(args.resultDir, `${Date.now().toString()}-default`);
-      const opt = new RLSOptimizer(args);
+      const opt = OptimizerFactory.make(args);
 
       try {
         expect(() =>
@@ -103,7 +103,7 @@ describe("check usage of rbp (framepointer)", () => {
       const args = getTestArgs(filename);
       args.framePointer = "constant";
       args.resultDir = pathResolve(args.resultDir, `${Date.now().toString()}-${args.framePointer}`);
-      const opt = new RLSOptimizer(args);
+      const opt = OptimizerFactory.make(args);
 
       try {
         expect(() =>
@@ -135,7 +135,7 @@ describe("check usage of rbp (framepointer)", () => {
       const args = getTestArgs(filename);
       args.framePointer = "save";
       args.resultDir = pathResolve(args.resultDir, `${Date.now().toString()}-${args.framePointer}`);
-      const opt = new RLSOptimizer(args);
+      const opt = OptimizerFactory.make(args);
 
       try {
         expect(() =>

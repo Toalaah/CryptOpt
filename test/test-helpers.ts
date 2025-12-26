@@ -45,6 +45,7 @@ export function getTestArgs(filename: string): OptimizerArgs {
     logComment: "",
     proof: false,
     bridge: "fiat",
+    optimizer: "rls",
     curve,
     method,
     verbose: false,

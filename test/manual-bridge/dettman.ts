@@ -18,7 +18,7 @@ import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { afterAll, expect, it, vi } from "vitest";
 
-import { RLSOptimizer } from "@/optimizer";
+import { OptimizerFactory } from "@/optimizer";
 import type { OptimizerArgs } from "@/types";
 
 import { getTestArgs, nothing } from "../test-helpers";
@@ -48,7 +48,7 @@ it("optimise", () => {
     args.cFile = someCFilename;
     args.jsonFile = someJsonFilename;
     args.evals = 10;
-    const opt = new RLSOptimizer(args);
+    const opt = OptimizerFactory.make(args);
     console.warn({ someJsonFilename, someCFilename, resultDir: args.resultDir });
 
     try {

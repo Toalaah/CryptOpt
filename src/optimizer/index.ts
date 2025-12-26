@@ -14,4 +14,5 @@
  * limitations under the License.
  */
 
-export * from "./OptimizerFactory";
+export * from "./optimizer";
+export * from "./optimizerFactory";

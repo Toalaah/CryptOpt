@@ -708,6 +708,7 @@
     "curve": "curve25519",
     "c": "curve25519",
     "method": "square",
+    "optimizer": "rls",
     "m": "square",
     "bridge": "fiat",
     "jsonFile": "",

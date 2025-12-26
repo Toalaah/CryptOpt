@@ -17,7 +17,7 @@
 import { basename } from "path";
 import { afterAll, expect, it, vi } from "vitest";
 
-import { RLSOptimizer } from "@/optimizer";
+import { OptimizerFactory } from "@/optimizer";
 
 import { getTestArgs, nothing } from "../test-helpers";
 
@@ -34,7 +34,7 @@ it.skip("optimise", () => {
     args.evals = 1000;
     args.seed = 888980710;
 
-    const opt = new RLSOptimizer(args);
+    const opt = OptimizerFactory.make(args);
 
     try {
       expect(() =>

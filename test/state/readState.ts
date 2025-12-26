@@ -19,7 +19,7 @@ import { dirname, resolve as pathResolve } from "path";
 import { fileURLToPath } from "url";
 import { afterAll, expect, it, vi } from "vitest";
 
-import { RLSOptimizer } from "@/optimizer";
+import { OptimizerFactory } from "@/optimizer";
 
 import { getTestResultsPath, nothing } from "../test-helpers";
 
@@ -37,10 +37,11 @@ it("optimise", () => {
 
     const statefile = pathResolve(dir, "./seed0001673572829616.json");
     const args = JSON.parse(readFileSync(statefile).toString()).parsedArgs;
+    console.log(args.optimizer);
     args.resultDir = getTestResultsPath();
     args.readState = statefile;
     expect(args).toBeTruthy();
-    const opt = new RLSOptimizer(args);
+    const opt = OptimizerFactory.make(args);
 
     try {
       expect(() =>

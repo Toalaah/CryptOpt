@@ -15,13 +15,9 @@
  */
 
 import { OptimizerArgs } from "@/types";
-import { RLSOptimizer } from "@/optimizer/rls";
 import { SAOptimizer } from "@/optimizer/sa";
-
-export interface Optimizer {
-  getSymbolname(deleteCache: boolean): string;
-  optimise(): Promise<number>;
-}
+import { RLSOptimizer } from "@/optimizer/rls";
+import { Optimizer } from "@/optimizer";
 
 export class OptimizerFactory {
   public static make(args: OptimizerArgs): Optimizer {

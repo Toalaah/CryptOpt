@@ -42,7 +42,7 @@ import { RegisterAllocator } from "@/registerAllocator";
 import type { AnalyseResult, OptimizerArgs } from "@/types";
 
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "../util";
-import { init } from "./optimizer.helper.class";
+import { init } from "@/optimizer/helpers";
 import { Optimizer } from "../OptimizerFactory";
 
 let choice: CHOICE;

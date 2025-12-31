@@ -23,6 +23,8 @@ import type { asm, CryptOpt } from "@/types";
 
 import { sanityCheckAllocations } from "./assembler.helper";
 
+export const strip = (code: asm[]) => code.filter((line) => line && !line.startsWith(";") && line !== "\n");
+
 export function assemble(resultspath: string): { stacklength: number; code: asm[] } {
   Logger.log("initializing RA.");
   const ra = RegisterAllocator.reset();

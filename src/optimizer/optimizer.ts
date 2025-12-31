@@ -22,11 +22,59 @@ import { Measuresuite } from "measuresuite";
 import { tmpdir } from "os";
 import { join } from "path";
 import { init } from "./helpers";
+import { Model } from "@/model";
+import { CHOICE, FUNCTIONS } from "@/enums";
+import globals from "@/helper/globals";
+import { RegisterAllocator } from "@/registerAllocator";
+import { errorOut, ERRORS } from "@/errors";
+import { writeString } from "@/helper";
 
 export abstract class Optimizer {
   protected symbolname: string;
+  protected no_of_instructions: number;
   protected libcheckfunctionDirectory: string;
   protected measuresuite: Measuresuite;
+  protected numMut: { [id: string]: number } = {
+    permutation: 0,
+    decision: 0,
+  };
+  protected numRevert: { [id: string]: number } = {
+    permutation: 0,
+    decision: 0,
+  };
+
+  protected asmStrings: { [k in FUNCTIONS]: string } = {
+    [FUNCTIONS.F_A]: "",
+    [FUNCTIONS.F_B]: "",
+  };
+
+  protected choice: CHOICE;
+
+  protected handleMeasurementError(e: any): never {
+    const isIncorrect = e instanceof Error && e.message.includes("tested_incorrect");
+    const isInvalid = e instanceof Error && e.message.includes("could not be assembled");
+    if (isInvalid || isIncorrect) {
+      writeString(join(this.args.resultDir, "tested_incorrect_A.asm"), this.asmStrings[FUNCTIONS.F_A]);
+      writeString(join(this.args.resultDir, "tested_incorrect_B.asm"), this.asmStrings[FUNCTIONS.F_B]);
+      writeString(
+        join(this.args.resultDir, "tested_incorrect.json"),
+        JSON.stringify({
+          nodes: Model.nodesInTopologicalOrder,
+        }),
+      );
+    }
+
+    if (isIncorrect) {
+      errorOut(ERRORS.measureIncorrect);
+    }
+    if (isInvalid) {
+      errorOut(ERRORS.measureInvalid);
+    }
+
+    writeString(join(this.args.resultDir, "generic_error_A.asm"), this.asmStrings[FUNCTIONS.F_A]);
+    writeString(join(this.args.resultDir, "generic_error_B.asm"), this.asmStrings[FUNCTIONS.F_B]);
+    errorOut(ERRORS.measureGeneric);
+  }
 
   public constructor(protected args: OptimizerArgs) {
     const { seed } = args;
@@ -36,6 +84,18 @@ export abstract class Optimizer {
     const { measuresuite, symbolname } = init(this.libcheckfunctionDirectory, args);
     this.measuresuite = measuresuite;
     this.symbolname = symbolname;
+    this.choice = CHOICE.PERMUTE;
+    // load a saved state if necessary
+    if (args.readState) {
+      Model.import(args.readState);
+    }
+    this.no_of_instructions = -1;
+
+    globals.convergence = [];
+    globals.mutationLog = [
+      "evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
+    ];
+    RegisterAllocator.options = args;
   }
 
   public abstract optimise(): Promise<number>;
@@ -47,7 +107,7 @@ export abstract class Optimizer {
     return this.symbolname;
   }
 
-  private cleanLibcheckfunctions() {
+  protected cleanLibcheckfunctions() {
     if (existsSync(this.libcheckfunctionDirectory)) {
       try {
         Logger.log(`Removing lib check functions in '${this.libcheckfunctionDirectory}'`);
@@ -56,6 +116,41 @@ export abstract class Optimizer {
       } catch (e) {
         console.error(e);
         throw e;
+      }
+    }
+  }
+
+  protected revertFunction = (): void => {};
+
+  protected mutate(random: boolean = false): void {
+    if (random) {
+      this.choice = Paul.pick([CHOICE.PERMUTE, CHOICE.DECISION]);
+    }
+    Logger.log("Mutationalita");
+    switch (this.choice) {
+      case CHOICE.PERMUTE: {
+        Model.mutatePermutation();
+        this.revertFunction = () => {
+          this.numRevert.permutation++;
+          Model.revertLastMutation();
+        };
+        this.numMut.permutation++;
+        break;
+      }
+      case CHOICE.DECISION: {
+        const hasHappend = Model.mutateDecision();
+        if (!hasHappend) {
+          // this is the case, if there is no hot decisions.
+          this.choice = CHOICE.PERMUTE;
+          this.mutate(false);
+          return;
+        }
+        this.revertFunction = () => {
+          this.numRevert.decision++;
+          Model.revertLastMutation();
+        };
+
+        this.numMut.decision++;
       }
     }
   }

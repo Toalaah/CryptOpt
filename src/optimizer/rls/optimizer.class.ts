@@ -15,14 +15,12 @@
  */
 
 import { execSync } from "child_process";
-import { appendFileSync, existsSync, rmSync } from "fs";
-import { Measuresuite } from "measuresuite";
-import { tmpdir } from "os";
+import { appendFileSync } from "fs";
 import { join, resolve as pathResolve } from "path";
 
 import { assemble } from "@/assembler";
 import { FiatBridge } from "@/bridge/fiat-bridge";
-import { CHOICE, FUNCTIONS } from "@/enums";
+import { FUNCTIONS } from "@/enums";
 import { errorOut, ERRORS } from "@/errors";
 import {
   analyseMeasureResult,
@@ -37,84 +35,20 @@ import {
 import globals from "@/helper/globals";
 import Logger from "@/helper/Logger.class";
 import { Model } from "@/model";
-import { RegisterAllocator } from "@/registerAllocator";
 import type { AnalyseResult, OptimizerArgs } from "@/types";
 
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "../util";
 import { Optimizer } from "@/optimizer";
 import { Paul } from "@/paul";
 
-let choice: CHOICE;
-
 export class RLSOptimizer extends Optimizer {
   public constructor(args: OptimizerArgs) {
     super(args);
-    globals.convergence = [];
-    globals.mutationLog = [
-      "evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
-    ];
-    // load a saved state if necessary
-    if (args.readState) {
-      Model.import(args.readState);
-    }
-    RegisterAllocator.options = args;
-  }
-
-  private no_of_instructions = -1;
-  private asmStrings: { [k in FUNCTIONS]: string } = {
-    [FUNCTIONS.F_A]: "",
-    [FUNCTIONS.F_B]: "",
-  };
-  private numMut: { [id: string]: number } = {
-    permutation: 0,
-    decision: 0,
-  };
-  private numRevert: { [id: string]: number } = {
-    permutation: 0,
-    decision: 0,
-  };
-
-  private revertFunction = (): void => {
-    /**intentionally blank */
-  };
-  /** you usually don't want to mess with @param random.
-   * mutate should not be called from outside with @param random=false*/
-  private mutate(random = true): void {
-    if (random) {
-      choice = Paul.pick([CHOICE.PERMUTE, CHOICE.DECISION]);
-    }
-    Logger.log("Mutationalita");
-    switch (choice) {
-      case CHOICE.PERMUTE: {
-        Model.mutatePermutation();
-        this.revertFunction = () => {
-          this.numRevert.permutation++;
-          Model.revertLastMutation();
-        };
-        this.numMut.permutation++;
-        break;
-      }
-      case CHOICE.DECISION: {
-        const hasHappend = Model.mutateDecision();
-        if (!hasHappend) {
-          // this is the case, if there is no hot decisions.
-          choice = CHOICE.PERMUTE;
-          this.mutate(false);
-          return;
-        }
-        this.revertFunction = () => {
-          this.numRevert.decision++;
-          Model.revertLastMutation();
-        };
-
-        this.numMut.decision++;
-      }
-    }
   }
 
   public optimise() {
     return new Promise<number>((resolve) => {
-      Logger.log("starting optimisation");
+      Logger.log("starting rls optimisation");
       printStartInfo({
         ...this.args,
         symbolname: this.symbolname,
@@ -275,6 +209,7 @@ export class RLSOptimizer extends Optimizer {
             per_second_counter = 0;
           }
 
+          const choice = this.choice;
           logMutation({ choice, kept, numEvals });
           if (numEvals % PRINT_EVERY == 0) {
             // print every 10th eval
@@ -300,7 +235,6 @@ export class RLSOptimizer extends Optimizer {
               writeout,
             });
             process.stdout.write(statusline);
-
             globals.convergence.push(ratioString);
           }
 

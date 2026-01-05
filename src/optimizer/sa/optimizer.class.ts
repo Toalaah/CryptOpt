@@ -195,6 +195,16 @@ export class SAOptimizer extends Optimizer {
           globals.currentRatio = meanrawCheck / minRaw;
           ratioString = globals.currentRatio.toFixed(4);
 
+          const prevBestCycleCount = globals.bestEpoch.result?.rawMedian[0] ?? Infinity;
+          if (
+            /* Either best is empty. */
+            globals.bestEpoch.result === null ||
+            /* Or it is present and this epoch has shown improvement. */
+            minRaw < prevBestCycleCount
+          ) {
+            globals.bestEpoch = { result: analyseResult, epoch: numEvals };
+          }
+
           perSecondCounter++;
           if (Date.now() - time > 1000) {
             time = Date.now();

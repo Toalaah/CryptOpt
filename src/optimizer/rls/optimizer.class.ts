@@ -194,10 +194,21 @@ export class RLSOptimizer extends Optimizer {
           }
           const indexGood = Number(meanrawA > meanrawB);
           const indexBad = 1 - indexGood;
-          globals.currentRatio = meanrawCheck / Math.min(meanrawB, meanrawA);
+          const minRaw = Math.min(meanrawB, meanrawA);
+          globals.currentRatio = meanrawCheck / minRaw;
 
           const goodChunks = analyseResult.chunks[indexGood];
           const badChunks = analyseResult.chunks[indexBad];
+
+          const prevBestCycleCount = globals.bestEpoch.result?.rawMedian[0] ?? Infinity;
+          if (
+            /* Either best is empty. */
+            globals.bestEpoch.result === null ||
+            /* Or it is present and this epoch has shown improvement. */
+            minRaw < prevBestCycleCount
+          ) {
+            globals.bestEpoch = { result: analyseResult, epoch: numEvals };
+          }
 
           ratioString = globals.currentRatio /*aka: new ratio*/
             .toFixed(4);

@@ -190,6 +190,10 @@ if (parsedArgs.single) {
 // OPTIMIZATION DONE.
 // NOW Analyse and write files for graphing.
 
+process.stdout.write(
+  `\nBest cycle count: ${globals.bestEpoch.result!.rawMedian[0]} (epoch=${globals.bestEpoch.epoch})\n`,
+);
+
 const times: CryptoptGlobals["time"] = { validate: 0, generateCryptopt: 0, generateFiat: 0 };
 
 const parsed = Model.getState();

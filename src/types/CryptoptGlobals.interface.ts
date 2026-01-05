@@ -14,8 +14,14 @@
  * limitations under the License.
  */
 
+import { AnalyseResult } from "./AnalyseResult.type";
+
 export interface CryptoptGlobals {
   currentRatio: number;
+  bestEpoch: {
+    result: AnalyseResult | null;
+    epoch: number;
+  };
   convergence: string[]; // numbers, but .toFixed(4)
   time: {
     // in seconds

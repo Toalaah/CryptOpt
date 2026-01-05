@@ -18,6 +18,10 @@ import type { CryptoptGlobals } from "@/types";
 
 const globals: CryptoptGlobals = {
   currentRatio: Infinity,
+  bestEpoch: {
+    result: null,
+    epoch: Infinity,
+  },
   convergence: [] as string[], // numbers, but .toFixed(4)
   time: {
     // in seconds

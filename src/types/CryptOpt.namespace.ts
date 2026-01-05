@@ -37,6 +37,23 @@ export const OPTIMIZER_STRATEGY_SA = "sa";
 export const OPTIMIZER_STRATEGIES = [OPTIMIZER_STRATEGY_RLS, OPTIMIZER_STRATEGY_SA] as const;
 export type OPTIMIZER_STRATEGY_T = (typeof OPTIMIZER_STRATEGIES)[number];
 
+// START SA-specific types
+export const SA_NEIGHBOR_STRATEGY_UNIFORM = "uniform";
+export const SA_NEIGHBOR_STRATEGY_WEIGHTED = "weighted";
+export const SA_NEIGHBOR_STRATEGIES = [SA_NEIGHBOR_STRATEGY_UNIFORM, SA_NEIGHBOR_STRATEGY_WEIGHTED] as const;
+export type SA_NEIGHBOR_STRATEGY_T = (typeof SA_NEIGHBOR_STRATEGIES)[number];
+
+export const SA_COOLING_SCHEDULE_EXP = "exp";
+export const SA_COOLING_SCHEDULE_LIN = "lin";
+export const SA_COOLING_SCHEDULE_LOG = "log";
+export const SA_COOLING_SCHEDULES = [
+  SA_COOLING_SCHEDULE_EXP,
+  SA_COOLING_SCHEDULE_LIN,
+  SA_COOLING_SCHEDULE_LOG,
+] as const;
+export type SA_COOLING_SCHEDULE_T = (typeof SA_COOLING_SCHEDULES)[number];
+// END SA-specific types
+
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace CryptOpt {
   export type StateFile = {

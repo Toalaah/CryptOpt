@@ -33,9 +33,13 @@ import { errorOut, ERRORS } from "@/errors";
 import {
   FRAME_POINTER_OPTIONS,
   MEMORY_CONSTRAINTS_OPTIONS,
-  ParsedArgsT,
   OPTIMIZER_STRATEGIES,
   OPTIMIZER_STRATEGY_RLS,
+  ParsedArgsT,
+  SA_COOLING_SCHEDULES,
+  SA_COOLING_SCHEDULE_EXP,
+  SA_NEIGHBOR_STRATEGIES,
+  SA_NEIGHBOR_STRATEGY_UNIFORM,
 } from "@/types";
 
 const y = yargs(process.argv.slice(2));
@@ -64,6 +68,31 @@ export const parsedArgs = y
     describe: "Optimizer strategy to use.",
     choices: OPTIMIZER_STRATEGIES,
   })
+  // START SA-specific args
+  .option("saInitialTemperature", {
+    number: true,
+    default: 5230,
+    min: 1,
+    describe: "Initial annealing temperature to use (has no effect if optimizer is not set to 'sa').",
+  })
+  .option("saAcceptParam", {
+    number: true,
+    default: 6.0,
+    describe: "Acceptance parameter value (has no effect if optimizer is not set to 'sa').",
+  })
+  .option("saNeighborStrategy", {
+    string: true,
+    default: SA_NEIGHBOR_STRATEGY_UNIFORM,
+    describe: "Neighbor-selection strategy to use for SA (has no effect if optimizer is not set to 'sa').",
+    choices: SA_NEIGHBOR_STRATEGIES,
+  })
+  .option("saCoolingSchedule", {
+    string: true,
+    default: SA_COOLING_SCHEDULE_EXP,
+    describe: "Cooling schedule to use (has no effect if optimizer is not set to 'sa').",
+    choices: SA_COOLING_SCHEDULES,
+  })
+  // END SA-specific args
   .option("bridge", {
     string: true,
     default: "fiat",

@@ -17,7 +17,13 @@
 import { BRIDGES_T } from "@/bridge";
 import { METHOD_T } from "@/bridge/bitcoin-core-bridge";
 import { CURVE_T } from "@/bridge/fiat-bridge";
-import { FRAME_POINTER_OPTIONS_T, MEMORY_CONSTRAINTS_OPTIONS_T, OPTIMIZER_STRATEGY_T } from "@/types";
+import {
+  FRAME_POINTER_OPTIONS_T,
+  MEMORY_CONSTRAINTS_OPTIONS_T,
+  OPTIMIZER_STRATEGY_T,
+  SA_NEIGHBOR_STRATEGY_T,
+  SA_COOLING_SCHEDULE_T,
+} from "@/types";
 
 export type OptimizerArgs = {
   evals: number;
@@ -25,6 +31,12 @@ export type OptimizerArgs = {
   curve: CURVE_T;
   method: METHOD_T;
   optimizer: OPTIMIZER_STRATEGY_T;
+  // START SA-specific args
+  saInitialTemperature: number;
+  saAcceptParam: number;
+  saNeighborStrategy: SA_NEIGHBOR_STRATEGY_T;
+  saCoolingSchedule: SA_COOLING_SCHEDULE_T;
+  // END SA-specific args
   cyclegoal: number;
   readState?: string; // filename
   logComment: string;

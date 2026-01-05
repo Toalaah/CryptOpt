@@ -1,4 +1,4 @@
-import { OptimizerArgs } from "@/types";
+import { OptimizerArgs, SA_NEIGHBOR_STRATEGY_T } from "@/types";
 import { Optimizer } from "@/optimizer";
 import Logger from "@/helper/Logger.class";
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "@/optimizer/util";
@@ -26,58 +26,66 @@ import assert from "assert";
 import { each } from "lodash-es";
 
 export class SAOptimizer extends Optimizer {
-  // Copy of best state. For now a number, but needs to be an instance of model probably?
-  private xBest: number;
-  // Energy/performance of best candidate
-  private eBest: number;
-  // Same thing here.
-  private xCurrent: number;
-  private eCurrent: number;
   // Number of iterations to perform during optimization.
   private nIter: number;
+  private currentIter: number;
+  private msOpts: { batchSize: number; numBatches: number };
+  private accumulatedTimeSpentByMeasuring: number;
   // Optimizer-specific args
   private initialTemperature: number;
-  private accumulatedTimeSpentByMeasuring: number;
-  private msOpts: { batchSize: number; numBatches: number };
+  private acceptParam: number;
+  private neighborStrategy: SA_NEIGHBOR_STRATEGY_T;
+  private coolingSchedule: CoolingSchedule;
 
   public constructor(args: OptimizerArgs) {
     super(args);
-
-    this.xBest = Infinity;
-    this.eBest = Infinity;
-    this.xCurrent = Infinity;
-    this.eCurrent = Infinity;
     this.nIter = this.args.evals;
+    this.currentIter = 0;
     // measuresuite config
     this.msOpts = { batchSize: 200, numBatches: 31 };
     this.accumulatedTimeSpentByMeasuring = 0;
 
-    // TODO: make these configurable via CLI flags
-    this.initialTemperature = 5230;
+    this.acceptParam = this.args.saAcceptParam;
+    this.initialTemperature = this.args.saInitialTemperature;
+
+    // TODO: support alternative neighbor selection. For now this is basically a nop.
+    switch (this.args.saNeighborStrategy) {
+      case "uniform":
+        this.neighborStrategy = "uniform";
+        break;
+      case "weighted":
+        throw new Error("not implemented");
+      default:
+        throw new Error(`unknown annealing strategy: ${this.args.saNeighborStrategy}`);
+    }
+    Logger.log(`annealing strategy: ${this.neighborStrategy}`);
+
+    switch (this.args.saCoolingSchedule) {
+      case "exp":
+        this.coolingSchedule = makeExpCoolingSchedule(this.initialTemperature);
+        break;
+      case "lin":
+        throw new Error("not implemented");
+      case "log":
+        throw new Error("not implemented");
+      default:
+        throw new Error(`unknown cooling schedule: ${this.args.saCoolingSchedule}`);
+    }
   }
 
   private shouldAccept(currentEnergy: number, visitEnergy: number, temp: number) {
-    if (visitEnergy <= currentEnergy) {
+    const r = Math.random();
+    if (visitEnergy < currentEnergy) {
       return true;
     }
-    return false;
-    // const x = (visitEnergy - this.eCurrent) / temp;
-    // const pr = Math.exp(-x);
-    // Logger.log(`Accepting worse candidate with probability exp[${-x}]=${pr}`);
-    // return pr > Math.random();
+    const temp_step = temp / this.currentIter; // Scale temp according to current iteration.
+    const x = 1.0 - (this.acceptParam * (visitEnergy - currentEnergy)) / temp_step;
+    const pr = x <= 0 ? 0 : Math.exp(Math.log(x) / this.acceptParam);
+    Logger.log(`Accepting worse candidate with probability ${pr}`);
+    return pr >= r;
   }
 
-  // Exponential cooling schedule
-  private temperature(t: number): number {
-    const visit = 2.62;
-    const a = visit - 1;
-    const t1 = Math.expm1(a * Math.log(2.0));
-    const s = t + 2.0;
-    const t2 = Math.expm1(a * Math.log(s));
-    return (this.initialTemperature * t1) / t2;
-  }
-
-  // Map mean cycle count into an appropriately scaled energy value.
+  // TODO: need to scale this somehow?
   private energy(x: number): number {
     return x;
   }
@@ -119,6 +127,7 @@ export class SAOptimizer extends Optimizer {
       for (let numEvals = 0; numEvals < this.nIter; numEvals++) {
         const candidateFunction = toggleFUNCTIONS(currentFunction);
         this.mutate();
+        this.currentIter = numEvals + 1;
 
         // Assemble current model state.
         {
@@ -172,7 +181,7 @@ export class SAOptimizer extends Optimizer {
           (kept = this.shouldAccept(
             this.energy(meanrawCurrent),
             this.energy(meanrawNew),
-            this.temperature(numEvals),
+            this.coolingSchedule(numEvals),
           ))
         ) {
           Logger.log("keeping mutated candidate");
@@ -308,3 +317,17 @@ export class SAOptimizer extends Optimizer {
     });
   }
 }
+
+function makeExpCoolingSchedule(initialTemp: number): CoolingSchedule {
+  const visit = 2.62;
+  const a = visit - 1;
+  const t1 = Math.expm1(a * Math.log(2.0));
+
+  return (t: number) => {
+    const s = t + 2.0;
+    const t2 = Math.expm1(a * Math.log(s));
+    return (initialTemp * t1) / t2;
+  };
+}
+
+type CoolingSchedule = (n: number) => number;

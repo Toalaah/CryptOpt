@@ -18,6 +18,10 @@
 _arguments -S -s \
     '(--bridge)--bridge=[Bridge]:bridge:->bridges' \
     '(-o --optimizer)'{-o=,-optimizer=}'[Optimizer strategy to use]:optimizer:->optimizers' \
+    '--saInitialTemperature=[Initial temperature value to use for annealing. Has no effect if optimizer strategy is NOT sa]:sa_temp:' \
+    '--saNeighborStrategy=[Neighbor-selection strategy to use for SA. Has no effect if optimizer strategy is NOT sa]:neighborstrategy:->neighborstrategies' \
+    '--saCoolingSchedule=[Cooling schedule to employ when using SA optimizer. Has no effect if optimizer strategy is NOT sa]:coolingschedule:->coolingschedules' \
+    '--saAcceptParam=[Acceptance parameter factor for annealing candidate selection. Has no effect if optimizer strategy is NOT sa]:sa_accpr:' \
     '(-c --curve -j --jsonFile -f --cFile)'{-c,--curve=}'[Curve]:curve:->curves' \
     '(-m --method -j --jsonFile -f --cFile)'{-m,--method=}'[Method]:method:->methods' \
     '(-j --jsonFile -c --curve -m --method)'{-j,--jsonFile=}'[JSON-CODE, must --bridge manual]:json:_files -g \*.json' \
@@ -58,6 +62,17 @@ case "$state" in
 		_values  'method' \
 			'mul[Multiplication]' \
 			'square[Square]' \
+		;;
+	neighborstrategies)
+		_values  'neighborstrategy' \
+			'uniform[Uniform selection of candidates]' \
+			'weighted[Weighted candidate selection]'
+		;;
+	coolingschedules)
+		_values  'coolingschedule' \
+			'exp[Exponential cooling schedule]' \
+			'lin[Linear cooling schedule]' \
+			'log[Logarithmic cooling schedule]' \
 		;;
 	curves)
 		_values 'curve' \

@@ -1,4 +1,4 @@
-import { AnalyseResult, OptimizerArgs } from "@/types";
+import { OptimizerArgs } from "@/types";
 import { Optimizer } from "@/optimizer";
 import Logger from "@/helper/Logger.class";
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "@/optimizer/util";
@@ -24,8 +24,6 @@ import { execSync } from "child_process";
 import { appendFileSync } from "fs";
 import assert from "assert";
 import { each } from "lodash-es";
-
-type Optional<T> = T | undefined;
 
 export class SAOptimizer extends Optimizer {
   // Copy of best state. For now a number, but needs to be an instance of model probably?
@@ -192,8 +190,9 @@ export class SAOptimizer extends Optimizer {
           const goodChunks = analyseResult.chunks[indexGood];
           const badChunks = analyseResult.chunks[indexBad];
           const choice = this.choice;
+          const minRaw = Math.min(meanrawCurrent, meanrawNew);
 
-          globals.currentRatio = meanrawCheck / Math.min(meanrawCurrent, meanrawNew);
+          globals.currentRatio = meanrawCheck / minRaw;
           ratioString = globals.currentRatio.toFixed(4);
 
           perSecondCounter++;

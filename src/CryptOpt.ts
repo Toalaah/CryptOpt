@@ -38,6 +38,7 @@ import { sha1Hash } from "@/paul";
 import type { CryptOpt, CryptoptGlobals, OptimizerArgs } from "@/types";
 
 import Logger from "./helper/Logger.class";
+import globals from "./helper/globals";
 
 let parsedArgs = parsedArgsFromCli;
 if (parsedArgs.startFromBestJson) {
@@ -76,7 +77,8 @@ else if (parsedArgsFromCli.readState) {
   }
 }
 
-const { single, bets, betRatio, curve, method, verbose } = parsedArgs;
+const { bets, betRatio, curve, method, verbose } = parsedArgs;
+
 if (parsedArgs.resultDir == "") {
   parsedArgs.resultDir = resolve(process.cwd(), "results");
 }
@@ -86,6 +88,15 @@ if (!verbose) {
     // intentionally empty
   };
 }
+
+// Probably bet stage works with SA, but disable it for now.
+if (!parsedArgs.single && parsedArgs.optimizer != "rls") {
+  Logger.log(
+    `Optimizer strategy ${parsedArgs.optimizer} does not support bet-stage, setting single-run mode.`,
+  );
+  parsedArgs.single = true;
+}
+
 // Idea is: if you want debug messages, you want to compile with DEBUG and run with --verbose,
 // compile with DEBUG | run with --verbose | outcome
 //         0          |          0         |      no debug msg while running, and not in asm
@@ -156,7 +167,7 @@ let runResults: RunResult[];
 const allocatedToPopulation = parsedArgs.evals * betRatio; // total for population
 const offspringEvals = allocatedToPopulation / bets; // each of the offspring
 
-if (single) {
+if (parsedArgs.single) {
   const fullArgs = {
     ...parsedArgs,
     logComment: `${parsedArgs.logComment} run`,
@@ -208,12 +219,12 @@ const [datFileFull, gpFileFull, pdfFileFull] = generateResultFilename({ ...parse
 ]);
 
 writeString(datFileFull, spaceSeparated.join("\n"));
-process.stdout.write(`Wrote ${cy}${datFileFull}${re} ${spaceSeparated.length}x${longestDataRow}`);
+process.stdout.write(`Wrote ${cy}${datFileFull}${re} ${spaceSeparated.length}x${longestDataRow}\n`);
 
 Logger.log(JSON.stringify(times));
 const title = [
   `${curve.replace("_", "\\\\_")}-${method}`,
-  single ? "Single Run" : `Restarts^{${bets}}_{${(offspringEvals / parsedArgs.evals) * 100} %}`,
+  parsedArgs.single ? "Single Run" : `Restarts^{${bets}}_{${(offspringEvals / parsedArgs.evals) * 100} %}`,
   `#Mutations ${SI(parsedArgs.evals)}`,
   new Date().toISOString(),
   hostname(),
@@ -243,7 +254,7 @@ writeString(
   ].join("\n"),
 );
 
-process.stdout.write(" Gen Pdf...");
+process.stdout.write("Gen Pdf...");
 const d = (chunk: Buffer | string) => {
   const str = chunk.toString();
   if (
@@ -254,6 +265,7 @@ const d = (chunk: Buffer | string) => {
     !str.includes("matrix contains missing or undefined values")
   ) {
     process.stdout.write(str);
+    process.stdout.write("\n");
   }
 };
 

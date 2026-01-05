@@ -85,11 +85,11 @@ export abstract class Optimizer {
     this.measuresuite = measuresuite;
     this.symbolname = symbolname;
     this.choice = CHOICE.PERMUTE;
+    this.no_of_instructions = -1;
     // load a saved state if necessary
     if (args.readState) {
       Model.import(args.readState);
     }
-    this.no_of_instructions = -1;
 
     globals.convergence = [];
     globals.mutationLog = [

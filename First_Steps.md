@@ -5,7 +5,7 @@
 While optimizing, CryptOpt will output the current status of the optimization.
 Each line has this format:
 ```
-fiat_curve25519_carry_square|1/10| 14|bs  181|#inst: 140|cyclΔ     70|G  58 cycl σ  0|B  59 cycl σ  0|L  55|l/g 0.9519| P|P[ -14/   0/  14/ -11]|D[MU/  1/ 31/ 59]| 90.0( 1%)  60/s
+fiat_curve25519_carry_square|1/10|opt:rls| 14|bs  181|#inst: 140|cyclΔ     70|G  58 cycl σ  0|B  59 cycl σ  0|L  55|l/g 0.9519| P|P[ -14/   0/  14/ -11]|D[MU/  1/ 31/ 59]| 90.0( 1%)  60/s
 ```
 Lets break this down:
 
@@ -13,6 +13,7 @@ Field                 |Example    | Comment
 --|--|--
 Symbol                | `fiat_curve25519_carry_square`	| The symbol being optimized.
 Comment               | 1/10                            | Arbitrary comment. Usually used in Bet-n-run mode. Then, it means bet `1` from `10`, after that it'll say `run`.
+Optimizer             | opt:rls                         | Currently selected optimizer strategy.
 Stack size            | 14	                 	        | How many spills to memory there are. E.g. `6` for all spills of the six callee-saved registers
 Batch Size            | bs  181		                    | `BS` in the paper, How big is the batch. i.e. how many iterations of *Symbol* are counted
 Instr. Count          | #inst: 140		                | How many instructions are used to implement the *Symbol*

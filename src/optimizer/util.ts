@@ -20,7 +20,7 @@ import { CHOICE } from "@/enums";
 import { bl, cy, env, gn, pu, rd, re, shouldProof, SI, yl } from "@/helper";
 import globals from "@/helper/globals";
 import { Model } from "@/model";
-import type { AnalyseResult, OptimizerArgs } from "@/types";
+import type { AnalyseResult, OPTIMIZER_STRATEGY_T, OptimizerArgs } from "@/types";
 
 const { CC, CFLAGS } = env;
 
@@ -35,6 +35,7 @@ export function genStatusLine(a: {
   indexGood: number;
   indexBad: number;
   goodChunks: number;
+  optimizer: OPTIMIZER_STRATEGY_T;
   badChunks: number;
   choice: CHOICE;
   kept: boolean;
@@ -51,6 +52,7 @@ export function genStatusLine(a: {
     // general
     `${a.writeout ? "\n" : "\r"}${a.symbolname}`,
     `${a.logComment ?? "-"}`,
+    `opt:${a.optimizer}`,
     `${bl}${a.stacklength.toString().padStart(3)}${re}`,
     `${cy}bs${a.batchSize.toString().padStart(5)}${re}`,
     `#inst:${cy}${a.no_of_instructions.toString().padStart(4)}${re}`,

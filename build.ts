@@ -1,16 +1,24 @@
 import { Copy } from "./copyplugin";
+import { Strip } from "bun-plugin-strip";
 
 import fs from "fs";
+
 const outdir = "./dist";
+const tsconfigPath = "./tsconfig.json";
 fs.rmSync(outdir, { recursive: true, force: true });
 Bun.build({
-  tsconfig: "./tsconfig.json",
+  tsconfig: tsconfigPath,
   entrypoints: ["./src/CountCycle.ts", "./src/CryptOpt.ts"],
   target: "node",
-  minify: false,
+  minify: false, // !("DEBUG" in process.env),
   outdir: outdir,
   external: ["*.node"],
   plugins: [
+    Strip({
+      include: ["**/*.ts"],
+      functions: "DEBUG" in process.env ? [] : ["Logger.log"],
+      tsconfigPath,
+    }),
     Copy({
       assets: [
         {

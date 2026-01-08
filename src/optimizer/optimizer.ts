@@ -137,7 +137,7 @@ export abstract class Optimizer {
 
   protected revertFunction = (): void => {};
 
-  protected mutate(random: boolean = false): void {
+  protected mutate(random: boolean = true): void {
     if (random) {
       this.choice = Paul.pick([CHOICE.PERMUTE, CHOICE.DECISION]);
     }

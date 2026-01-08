@@ -34,6 +34,7 @@ export type OptimizerArgs = {
   // START SA-specific args
   saInitialTemperature: number;
   saAcceptParam: number;
+  saVisitParam: number;
   saNeighborStrategy: SA_NEIGHBOR_STRATEGY_T;
   saCoolingSchedule: SA_COOLING_SCHEDULE_T;
   // END SA-specific args

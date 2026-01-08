@@ -34,6 +34,7 @@ export class SAOptimizer extends Optimizer {
   // Optimizer-specific args
   private initialTemperature: number;
   private acceptParam: number;
+  private visitParam: number;
   private neighborStrategy: SA_NEIGHBOR_STRATEGY_T;
   private coolingSchedule: CoolingSchedule;
 
@@ -46,6 +47,7 @@ export class SAOptimizer extends Optimizer {
     this.accumulatedTimeSpentByMeasuring = 0;
 
     this.acceptParam = this.args.saAcceptParam;
+    this.visitParam = this.args.saVisitParam;
     this.initialTemperature = this.args.saInitialTemperature;
 
     // TODO: support alternative neighbor selection. For now this is basically a nop.
@@ -56,21 +58,24 @@ export class SAOptimizer extends Optimizer {
       case "weighted":
         throw new Error("not implemented");
       default:
-        throw new Error(`unknown annealing strategy: ${this.args.saNeighborStrategy}`);
+        throw new Error(`unknown neighbor proposal strategy: ${this.args.saNeighborStrategy}`);
     }
     Logger.log(`annealing strategy: ${this.neighborStrategy}`);
 
     switch (this.args.saCoolingSchedule) {
       case "exp":
-        this.coolingSchedule = makeExpCoolingSchedule(this.initialTemperature);
+        this.coolingSchedule = makeExpCoolingSchedule(this.visitParam, this.initialTemperature);
         break;
       case "lin":
-        throw new Error("not implemented");
+        this.coolingSchedule = makeLinCoolingSchedule(this.nIter, this.visitParam, this.initialTemperature);
+        break;
       case "log":
-        throw new Error("not implemented");
+        this.coolingSchedule = makeLogCoolingSchedule(this.visitParam, this.initialTemperature);
+        break;
       default:
         throw new Error(`unknown cooling schedule: ${this.args.saCoolingSchedule}`);
     }
+    Logger.log(`cooling schedule: ${this.args.saCoolingSchedule}`);
   }
 
   private shouldAccept(currentEnergy: number, visitEnergy: number, temp: number) {
@@ -81,11 +86,23 @@ export class SAOptimizer extends Optimizer {
     const temp_step = temp / this.currentIter; // Scale temp according to current iteration.
     const x = 1.0 - (this.acceptParam * (visitEnergy - currentEnergy)) / temp_step;
     const pr = x <= 0 ? 0 : Math.exp(Math.log(x) / this.acceptParam);
-    Logger.log(`Accepting worse candidate with probability ${pr}`);
+    Logger.log(`accepting worse candidate with probability ${pr}`);
     return pr >= r;
   }
 
-  // TODO: need to scale this somehow?
+  private shouldAcceptClassic(currentEnergy: number, visitEnergy: number, temp: number) {
+    const r = Math.random();
+    if (visitEnergy < currentEnergy) {
+      return true;
+    }
+    const x = visitEnergy - currentEnergy;
+    const pr = Math.exp(-x / temp);
+    assert(0 < pr && pr <= 1);
+    Logger.log(`accepting worse candidate with probability ${pr}`);
+    return pr >= r;
+  }
+
+  // TODO: should this be somehow scaled?
   private energy(x: number): number {
     return x;
   }
@@ -319,9 +336,8 @@ export class SAOptimizer extends Optimizer {
   }
 }
 
-function makeExpCoolingSchedule(initialTemp: number): CoolingSchedule {
-  const visit = 2.62;
-  const a = visit - 1;
+function makeExpCoolingSchedule(visitParam: number, initialTemp: number): CoolingSchedule {
+  const a = visitParam - 1;
   const t1 = Math.expm1(a * Math.log(2.0));
 
   return (t: number) => {
@@ -330,5 +346,24 @@ function makeExpCoolingSchedule(initialTemp: number): CoolingSchedule {
     return (initialTemp * t1) / t2;
   };
 }
+
+function makeLinCoolingSchedule(nIter: number, visitParam: number, initialTemp: number): CoolingSchedule {
+  return (t: number) => {
+    const factor = clamp(t / nIter, 0, 1);
+    return initialTemp * (1 - factor) * visitParam;
+  };
+}
+
+function makeLogCoolingSchedule(visitParam: number, initialTemp: number): CoolingSchedule {
+  const visit = 2.62;
+  const t1 = visit - visitParam;
+  return (t: number) => {
+    const a = Math.log(t1 * t);
+    const temp = initialTemp / a;
+    return temp < 0 ? 0 : temp;
+  };
+}
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
 type CoolingSchedule = (n: number) => number;

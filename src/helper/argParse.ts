@@ -75,6 +75,13 @@ export const parsedArgs = y
     min: 1,
     describe: "Initial annealing temperature to use (has no effect if optimizer is not set to 'sa').",
   })
+  .option("saVisitParam", {
+    number: true,
+    default: 1.62,
+    min: 1 + Number.EPSILON,
+    describe:
+      "Controls the visit parameter for tuning the cooling schedule. Lower values stetch the cooling tail. Must be strictly greater than one. (has no effect if optimizer is not set to 'sa').",
+  })
   .option("saAcceptParam", {
     number: true,
     default: 6.0,

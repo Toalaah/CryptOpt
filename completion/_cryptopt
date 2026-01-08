@@ -22,6 +22,8 @@ _arguments -S -s \
     '--saNeighborStrategy=[Neighbor-selection strategy to use for SA. Has no effect if optimizer strategy is NOT sa]:neighborstrategy:->neighborstrategies' \
     '--saCoolingSchedule=[Cooling schedule to employ when using SA optimizer. Has no effect if optimizer strategy is NOT sa]:coolingschedule:->coolingschedules' \
     '--saAcceptParam=[Acceptance parameter factor for annealing candidate selection. Has no effect if optimizer strategy is NOT sa]:sa_accpr:' \
+    '--saVisitParam=[Visitng parameter factor for adjusting SA cooling schedule. Has no effect if optimizer strategy is NOT sa]:sa_visitpr:' \
+    '(--no-saReanneal --saReanneal)'{--no-saReanneal,--saReanneal}'[Disable/enable reannealing when using SA optimizer. Has no effect if optimizer strategy is NOT sa]:sa_reanneal:' \
     '(-c --curve -j --jsonFile -f --cFile)'{-c,--curve=}'[Curve]:curve:->curves' \
     '(-m --method -j --jsonFile -f --cFile)'{-m,--method=}'[Method]:method:->methods' \
     '(-j --jsonFile -c --curve -m --method)'{-j,--jsonFile=}'[JSON-CODE, must --bridge manual]:json:_files -g \*.json' \

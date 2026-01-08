@@ -211,7 +211,7 @@ export class SAOptimizer extends Optimizer {
             /* Or it is present and this epoch has shown improvement. */
             minRaw < prevBestCycleCount
           ) {
-            globals.bestEpoch = { result: analyseResult, epoch: numEvals };
+            globals.bestEpoch = { result: analyseResult, indexGood, epoch: numEvals };
           }
 
           perSecondCounter++;
@@ -226,6 +226,7 @@ export class SAOptimizer extends Optimizer {
           if (numEvals % PRINT_EVERY == 0) {
             const statusline = genStatusLine({
               ...this.args,
+              logComment: this.args.logComment + ` temp=${this.coolingSchedule(this.currentIter).toFixed(2)}`,
               analyseResult,
               badChunks,
               batchSize: this.msOpts.batchSize,

@@ -99,6 +99,21 @@ export abstract class Optimizer {
   }
 
   public abstract optimise(): Promise<number>;
+  public getMutationStats(): {
+    numMut: { permutation: number; decision: number };
+    numRevert: { permutation: number; decision: number };
+  } {
+    return {
+      numMut: {
+        decision: this.numMut.decision,
+        permutation: this.numMut.permutation,
+      },
+      numRevert: {
+        decision: this.numRevert.decision,
+        permutation: this.numRevert.permutation,
+      },
+    };
+  }
 
   public getSymbolname(deleteCache: boolean = false) {
     if (deleteCache) {

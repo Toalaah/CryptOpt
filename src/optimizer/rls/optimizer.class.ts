@@ -207,7 +207,7 @@ export class RLSOptimizer extends Optimizer {
             /* Or it is present and this epoch has shown improvement. */
             minRaw < prevBestCycleCount
           ) {
-            globals.bestEpoch = { result: analyseResult, epoch: numEvals };
+            globals.bestEpoch = { result: analyseResult, indexGood, epoch: numEvals };
           }
 
           ratioString = globals.currentRatio /*aka: new ratio*/

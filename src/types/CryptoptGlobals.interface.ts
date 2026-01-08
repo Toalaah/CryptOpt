@@ -20,6 +20,7 @@ export interface CryptoptGlobals {
   currentRatio: number;
   bestEpoch: {
     result: AnalyseResult | null;
+    indexGood: number;
     epoch: number;
   };
   convergence: string[]; // numbers, but .toFixed(4)

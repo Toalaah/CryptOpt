@@ -108,7 +108,15 @@ if (!parsedArgs.single && parsedArgs.optimizer != "rls") {
 const symbolname = OptimizerFactory.make(parsedArgs).getSymbolname(true);
 registerExitHooks({ ...parsedArgs, symbolname });
 
-type RunResult = { statefile: string; ratio: number; convergence: string[] };
+type RunResult = {
+  statefile: string;
+  ratio: number;
+  convergence: string[];
+  mutationStats: {
+    numMut: { permutation: number; decision: number };
+    numRevert: { permutation: number; decision: number };
+  };
+};
 
 async function allBets(evals: number, bets: number): Promise<RunResult[]> {
   const runRes = [] as RunResult[];
@@ -159,7 +167,7 @@ async function run(args: OptimizerArgs): Promise<RunResult> {
   const [statefile] = generateResultFilename({ ...args, symbolname: optimizer.getSymbolname(false) });
   Model.persist(statefile, parsedArgs);
   const { ratio, convergence } = Model.getState();
-  return { statefile, ratio, convergence };
+  return { statefile, ratio, convergence, mutationStats: optimizer.getMutationStats() };
 }
 
 let runResults: RunResult[];
@@ -188,11 +196,15 @@ if (parsedArgs.single) {
 }
 
 // OPTIMIZATION DONE.
-// NOW Analyse and write files for graphing.
+// Output some stats informally.
 
 process.stdout.write(
-  `\nBest cycle count: ${globals.bestEpoch.result!.rawMedian[0]} (epoch=${globals.bestEpoch.epoch})\n`,
+  `\nBest cycle count: ${globals.bestEpoch.result!.batchSizeScaledrawMedian[globals.bestEpoch.indexGood].toFixed(0)} (epoch=${globals.bestEpoch.epoch})\n`,
 );
+process.stdout.write(`Run result: ${JSON.stringify(runResults[runResults.length - 1].mutationStats)}\n`);
+process.stdout.write(`Convergence: ${runResults[runResults.length - 1].convergence}\n`);
+
+// NOW Analyse and write files for graphing.
 
 const times: CryptoptGlobals["time"] = { validate: 0, generateCryptopt: 0, generateFiat: 0 };
 

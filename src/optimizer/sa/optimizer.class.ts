@@ -24,6 +24,7 @@ import { execSync } from "child_process";
 import { appendFileSync } from "fs";
 import assert from "assert";
 import { each } from "lodash-es";
+import { sum } from "simple-statistics";
 
 export class SAOptimizer extends Optimizer {
   // Number of iterations to perform during optimization.
@@ -35,7 +36,8 @@ export class SAOptimizer extends Optimizer {
   private initialTemperature: number;
   private acceptParam: number;
   private visitParam: number;
-  private neighborStrategy: SA_NEIGHBOR_STRATEGY_T;
+  private neighborSelectionFunc: NeighborSelectionFunc<number>;
+
   private coolingSchedule: CoolingSchedule;
 
   public constructor(args: OptimizerArgs) {
@@ -49,18 +51,23 @@ export class SAOptimizer extends Optimizer {
     this.acceptParam = this.args.saAcceptParam;
     this.visitParam = this.args.saVisitParam;
     this.initialTemperature = this.args.saInitialTemperature;
+    this.reanneal = this.args.saReanneal;
 
     // TODO: support alternative neighbor selection. For now this is basically a nop.
     switch (this.args.saNeighborStrategy) {
       case "uniform":
-        this.neighborStrategy = "uniform";
+        this.neighborSelectionFunc = uniformNeighborSelection();
         break;
       case "weighted":
-        throw new Error("not implemented");
+        if (this.args.saNumNeighbors > 1) {
+          this.neighborSelectionFunc = weigtedNeighborSelection(this.args.saNumNeighbors);
+        }
+        // Should probably warn on this.
+        this.neighborSelectionFunc = uniformNeighborSelection();
       default:
         throw new Error(`unknown neighbor proposal strategy: ${this.args.saNeighborStrategy}`);
     }
-    Logger.log(`annealing strategy: ${this.neighborStrategy}`);
+    Logger.log(`neighbor strategy: ${this.args.saNeighborStrategy}`);
 
     switch (this.args.saCoolingSchedule) {
       case "exp":
@@ -367,3 +374,25 @@ function makeLogCoolingSchedule(visitParam: number, initialTemp: number): Coolin
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
 type CoolingSchedule = (n: number) => number;
+
+function uniformNeighborSelection(): NeighborSelectionFunc<number> {
+  return (candidates: number[]) => candidates[Paul.chooseBetween(candidates.length)];
+}
+
+function weigtedNeighborSelection(n: number): NeighborSelectionFunc<number> {
+  if (n < 2) throw new Error(`invalid neighbor size: ${n}`);
+  const normalizingFactor = 1 / (n - 1);
+
+  return (candidates: number[]) => {
+    const totalEnergy = sum(candidates);
+    const probabilities = new Array<number>(n);
+    for (let i = 0; i < candidates.length; ++i) {
+      const energy = candidates[i];
+      probabilities[i] = normalizingFactor * (1 - energy / totalEnergy);
+    }
+    const idx = Paul.chooseWithProbabilities(probabilities);
+    return candidates[idx];
+  };
+}
+
+type NeighborSelectionFunc<T> = (neighbors: T[]) => T;

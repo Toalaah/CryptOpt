@@ -27,6 +27,7 @@ import type { CryptOpt } from "@/types";
 
 import { BIAS } from "./Paul.enum";
 import { sha1Hash } from "./Paul.helper";
+import { sum } from "simple-statistics";
 
 export class Paul {
   // https://en.wikipedia.org/wiki/Paul_the_Octopus
@@ -135,6 +136,16 @@ export class Paul {
 
   public static chooseImm<T>(elements: T[]): T {
     return Paul.choose(elements, DECISION_IDENTIFIER.DI_CHOOSE_IMM);
+  }
+
+  public static chooseWithProbabilities(probabilities: number[]): number {
+    if (sum(probabilities) !== 1) throw new Error("invalid probabily distribution");
+    let choice = Math.random();
+    const retIndex = probabilities.findIndex((pr) => {
+      choice -= pr;
+      return choice <= 0;
+    });
+    return retIndex;
   }
 
   /**

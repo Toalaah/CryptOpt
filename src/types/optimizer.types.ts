@@ -36,6 +36,7 @@ export type OptimizerArgs = {
   saAcceptParam: number;
   saVisitParam: number;
   saNeighborStrategy: SA_NEIGHBOR_STRATEGY_T;
+  saNumNeighbors: number;
   saCoolingSchedule: SA_COOLING_SCHEDULE_T;
   // END SA-specific args
   cyclegoal: number;

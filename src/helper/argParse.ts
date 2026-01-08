@@ -93,6 +93,13 @@ export const parsedArgs = y
     describe: "Neighbor-selection strategy to use for SA (has no effect if optimizer is not set to 'sa').",
     choices: SA_NEIGHBOR_STRATEGIES,
   })
+  .option("saNumNeighbors", {
+    number: true,
+    min: 1,
+    default: 1,
+    describe:
+      "Number of neighbors to sample in  each epoch. Note that this only has an effect if saNeighborStrategy=weighted.",
+  })
   .option("saCoolingSchedule", {
     string: true,
     default: SA_COOLING_SCHEDULE_EXP,

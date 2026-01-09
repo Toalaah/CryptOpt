@@ -1439,7 +1439,7 @@ export class RegisterAllocator {
 
     this.addToPreInstructions(
       Logger.log(
-        `\n; Operation: ${ni.name.join("--")}<-${ni.operation}(${ni.arguments.join(", ")}), ${
+        `; Operation: ${ni.name.join("--")}<-${ni.operation}(${ni.arguments.join(", ")}), ${
           ni.parameters?.comment ?? ""
         }`,
       ) ?? "",

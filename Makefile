@@ -44,7 +44,7 @@ $(FIAT_CHECKSUMS): $(addprefix $(FIAT_DATA_DIR)/, $(FIAT_BINARIES))
 
 $(BUILT_CRYPTOPT): node_modules $(shell find ./src -type f -name '*ts') $(FIAT_CHECKSUMS)
 	@echo "Building CryptOpt"
-	@PATH=$(PATH) bun run build.ts
+	@PATH=$(PATH) bun build.ts
 	@test -e "$(@)" && touch $(@) && echo "Successfully built CryptOpt. :)"
 
 check: $(BUILT_CRYPTOPT)

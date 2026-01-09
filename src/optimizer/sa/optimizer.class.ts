@@ -152,6 +152,7 @@ export class SAOptimizer extends Optimizer {
         const candidateFunction = toggleFUNCTIONS(currentFunction);
         this.mutate();
         this.currentIter = numEvals + 1;
+        Logger.log(`Current round: ${this.currentIter}`);
 
         // Assemble current model state.
         {
@@ -171,7 +172,7 @@ export class SAOptimizer extends Optimizer {
         // Write out asm strings if in verbose mode.
         if (this.args.verbose) {
           each(this.asmStrings, (asm, fn) => {
-            const fname = "current" + fn === FUNCTIONS.F_A ? "A" : "B" + ".asm";
+            const fname = "current" + (fn === FUNCTIONS.F_A ? "A" : "B") + ".asm";
             writeString(pathResolve(this.libcheckfunctionDirectory, fname), asm);
           });
         }

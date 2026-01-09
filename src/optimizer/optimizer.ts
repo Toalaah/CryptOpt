@@ -84,18 +84,20 @@ export abstract class Optimizer {
     const { measuresuite, symbolname } = init(this.libcheckfunctionDirectory, args);
     this.measuresuite = measuresuite;
     this.symbolname = symbolname;
-    this.choice = CHOICE.PERMUTE;
+
+    globals.convergence = [];
+    globals.mutationLog = [
+      "evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
+    ];
+
     this.no_of_instructions = -1;
     // load a saved state if necessary
     if (args.readState) {
       Model.import(args.readState);
     }
 
-    globals.convergence = [];
-    globals.mutationLog = [
-      "evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
-    ];
     RegisterAllocator.options = args;
+    this.choice = CHOICE.PERMUTE;
   }
 
   public abstract optimise(): Promise<number>;

@@ -51,19 +51,20 @@ export class SAOptimizer extends Optimizer {
     this.acceptParam = this.args.saAcceptParam;
     this.visitParam = this.args.saVisitParam;
     this.initialTemperature = this.args.saInitialTemperature;
-    this.reanneal = this.args.saReanneal;
 
-    // TODO: support alternative neighbor selection. For now this is basically a nop.
     switch (this.args.saNeighborStrategy) {
       case "uniform":
         this.neighborSelectionFunc = uniformNeighborSelection();
         break;
       case "weighted":
-        if (this.args.saNumNeighbors > 1) {
+        if (this.args.saNumNeighbors < 0) {
+          throw new Error("number of neighbors must be positive");
+        } else if (this.args.saNumNeighbors === 1) {
+          throw new Error("specified weighted neighbor strategy, but nonsensical neighbor count of 1");
+        } else {
           this.neighborSelectionFunc = weigtedNeighborSelection(this.args.saNumNeighbors);
         }
-        // Should probably warn on this.
-        this.neighborSelectionFunc = uniformNeighborSelection();
+        break;
       default:
         throw new Error(`unknown neighbor proposal strategy: ${this.args.saNeighborStrategy}`);
     }
@@ -97,17 +98,17 @@ export class SAOptimizer extends Optimizer {
     return pr >= r;
   }
 
-  private shouldAcceptClassic(currentEnergy: number, visitEnergy: number, temp: number) {
-    const r = Math.random();
-    if (visitEnergy < currentEnergy) {
-      return true;
-    }
-    const x = visitEnergy - currentEnergy;
-    const pr = Math.exp(-x / temp);
-    assert(0 < pr && pr <= 1);
-    Logger.log(`accepting worse candidate with probability ${pr}`);
-    return pr >= r;
-  }
+  // private shouldAcceptClassic(currentEnergy: number, visitEnergy: number, temp: number) {
+  //   const r = Math.random();
+  //   if (visitEnergy < currentEnergy) {
+  //     return true;
+  //   }
+  //   const x = visitEnergy - currentEnergy;
+  //   const pr = Math.exp(-x / temp);
+  //   assert(0 < pr && pr <= 1);
+  //   Logger.log(`accepting worse candidate with probability ${pr}`);
+  //   return pr >= r;
+  // }
 
   // TODO: should this be somehow scaled?
   private energy(x: number): number {

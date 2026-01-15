@@ -16,7 +16,7 @@ import {
   toggleFUNCTIONS,
 } from "@/helper";
 import globals from "@/helper/globals";
-import { assemble, strip } from "@/assembler";
+import { assemble as assembleASM, strip } from "@/assembler";
 import { Paul } from "@/paul";
 import { FiatBridge } from "@/bridge/fiat-bridge";
 import { errorOut, ERRORS } from "@/errors";
@@ -60,7 +60,9 @@ export class SAOptimizer extends Optimizer {
         if (this.args.saNumNeighbors < 0) {
           throw new Error("number of neighbors must be positive");
         } else if (this.args.saNumNeighbors === 1) {
-          throw new Error("specified weighted neighbor strategy, but nonsensical neighbor count of 1");
+          throw new Error(
+            "specified weighted neighbor strategy, but provided nonsensical neighbor count of 1",
+          );
         } else {
           this.neighborSelectionFunc = weigtedNeighborSelection(this.args.saNumNeighbors);
         }
@@ -121,6 +123,27 @@ export class SAOptimizer extends Optimizer {
     this.msOpts.batchSize = Math.max(this.msOpts.batchSize, 5);
   }
 
+  /**
+   * Assembles and saves the current model into `slot`.
+   */
+  private assemble(slot: FUNCTIONS) {
+    Logger.log("assembling");
+    const assembleResult = assembleASM(this.args.resultDir);
+    const code = assembleResult.code;
+    const filteredInstructions = strip(code);
+    this.no_of_instructions = filteredInstructions.length;
+    switch (this.args.verbose) {
+      case true:
+        const c = code.join("\n");
+        writeString(pathResolve(this.libcheckfunctionDirectory, "current.asm"), c);
+        this.asmStrings[slot] = c;
+        break;
+      case false:
+        this.asmStrings[slot] = filteredInstructions.join("\n");
+        break;
+    }
+  }
+
   public optimise() {
     return new Promise<number>((resolve) => {
       Logger.log("starting rls optimisation");
@@ -131,55 +154,40 @@ export class SAOptimizer extends Optimizer {
       });
       const optimistaionStartDate = Date.now();
       let ratioString = "";
+
       let currentFunction = FUNCTIONS.F_A;
+
       let stacklength = 0;
       let time = Date.now();
       let showPerSecond = "many/s";
       let perSecondCounter = 0;
-
-      // Baseline, original code.
-      {
-        const assembleResult = assemble(this.args.resultDir);
-        const code = assembleResult.code;
-        const filteredInstructions = code.filter((line) => line && !line.startsWith(";") && line !== "\n");
-        this.no_of_instructions = filteredInstructions.length;
-        // Write initial "clean" variant.
-        this.asmStrings[currentFunction] = filteredInstructions.join("\n");
-      }
-
-      // Main optimization loop.
-      for (let numEvals = 0; numEvals < this.nIter; numEvals++) {
-        const candidateFunction = toggleFUNCTIONS(currentFunction);
-        this.mutate();
-        this.currentIter = numEvals + 1;
-        Logger.log(`Current round: ${this.currentIter}`);
-
-        // Assemble current model state.
-        {
-          const assembleResult = assemble(this.args.resultDir);
-          const filteredInstructions = strip(assembleResult.code);
-          this.no_of_instructions = filteredInstructions.length;
-          // Update current mutation candidate.
-          this.asmStrings[candidateFunction] = filteredInstructions.join("\n");
-          stacklength = assembleResult.stacklength;
-        }
-
-        // At this point both programs in asmstrings will be populated.
-        each(this.asmStrings, (asm) =>
-          assert(!(asm === "" || asm.includes("undefined")), "ASM string empty, big yikes."),
+      const writeASM = (slot: FUNCTIONS) =>
+        writeString(
+          pathResolve(this.libcheckfunctionDirectory, `current${slot === FUNCTIONS.F_A ? "A" : "B"}.asm`),
+          this.asmStrings[slot],
         );
 
-        // Write out asm strings if in verbose mode.
-        if (this.args.verbose) {
-          each(this.asmStrings, (asm, fn) => {
-            const fname = "current" + (fn === FUNCTIONS.F_A ? "A" : "B") + ".asm";
-            writeString(pathResolve(this.libcheckfunctionDirectory, fname), asm);
-          });
-        }
+      // Before running the optimization loop, assemble the baseline program (at this point, no mutations have taken place).
+      {
+        this.assemble(currentFunction);
+        // Check for errors, if nothing happens here we are probably fine for the rest of the run.
+        if (this.asmStrings[currentFunction].includes("undefined"))
+          throw new Error("ASM string empty/undefined, big yikes");
+      }
 
-        // Perform measurement & analysis.
+      const intervalHandle = setInterval(() => {
+        const candidateFunction = toggleFUNCTIONS(currentFunction);
+
+        // Perform mutation && assemble current candidate.
+        this.mutate();
+        this.assemble(candidateFunction);
+
         const analyseResult = (() => {
           try {
+            if (this.args.verbose) {
+              writeASM(currentFunction);
+              writeASM(candidateFunction);
+            }
             const now = Date.now();
             Logger.log("comparing candidates");
             const results = this.measuresuite.measure(this.msOpts.batchSize, this.msOpts.numBatches, [
@@ -197,7 +205,7 @@ export class SAOptimizer extends Optimizer {
           }
         })();
 
-        const [meanrawCurrent, meanrawNew, meanrawCheck] = analyseResult.rawMedian;
+        const [meanrawCurrent, meanrawCandidate, meanrawCheck] = analyseResult.rawMedian;
         this.updateBatchSize(meanrawCheck); // Update batch size based on analysis results.
 
         // Decide whether we want to keep mutated candidate.
@@ -205,39 +213,27 @@ export class SAOptimizer extends Optimizer {
         if (
           (kept = this.shouldAccept(
             this.energy(meanrawCurrent),
-            this.energy(meanrawNew),
-            this.coolingSchedule(numEvals),
+            this.energy(meanrawCandidate),
+            this.coolingSchedule(this.currentIter),
           ))
         ) {
           Logger.log("keeping mutated candidate");
-          // Swap
           currentFunction = candidateFunction;
         } else {
           Logger.log("reverting mutation");
           this.revertFunction();
         }
 
-        // Status update
+        // Start statistics & status update.
         {
-          const indexGood = Number(meanrawCurrent > meanrawNew);
+          const indexGood = Number(meanrawCurrent > meanrawCandidate);
           const indexBad = 1 - indexGood;
           const goodChunks = analyseResult.chunks[indexGood];
           const badChunks = analyseResult.chunks[indexBad];
-          const choice = this.choice;
-          const minRaw = Math.min(meanrawCurrent, meanrawNew);
+          const minRaw = Math.min(meanrawCurrent, meanrawCandidate);
 
           globals.currentRatio = meanrawCheck / minRaw;
           ratioString = globals.currentRatio.toFixed(4);
-
-          const prevBestCycleCount = globals.bestEpoch.result?.rawMedian[0] ?? Infinity;
-          if (
-            /* Either best is empty. */
-            globals.bestEpoch.result === null ||
-            /* Or it is present and this epoch has shown improvement. */
-            minRaw < prevBestCycleCount
-          ) {
-            globals.bestEpoch = { result: analyseResult, indexGood, epoch: numEvals };
-          }
 
           perSecondCounter++;
           if (Date.now() - time > 1000) {
@@ -246,100 +242,118 @@ export class SAOptimizer extends Optimizer {
             perSecondCounter = 0;
           }
 
-          logMutation({ choice, kept, numEvals });
+          logMutation({ choice: this.choice, kept, numEvals: this.currentIter });
 
-          if (numEvals % PRINT_EVERY == 0) {
+          const prevBestCycleCount = globals.bestEpoch.result?.rawMedian[0] ?? Infinity;
+          if (
+            /* Either best is empty. */
+            globals.bestEpoch.result === null ||
+            /* Or it is present and this epoch has shown improvement. */
+            minRaw < prevBestCycleCount
+          ) {
+            globals.bestEpoch = { result: analyseResult, indexGood, epoch: this.currentIter };
+          }
+
+          if (this.currentIter % PRINT_EVERY == 0) {
             const statusline = genStatusLine({
               ...this.args,
               logComment: this.args.logComment + ` temp=${this.coolingSchedule(this.currentIter).toFixed(2)}`,
               analyseResult,
               badChunks,
               batchSize: this.msOpts.batchSize,
-              choice,
+              choice: this.choice,
               goodChunks,
               indexBad,
               indexGood,
               kept,
               no_of_instructions: this.no_of_instructions,
-              numEvals,
+              numEvals: this.currentIter,
               ratioString,
               show_per_second: showPerSecond,
               stacklength,
               symbolname: this.symbolname,
-              writeout: numEvals % (this.args.evals / LOG_EVERY) === 0,
+              writeout: this.currentIter % (this.args.evals / LOG_EVERY) === 0,
             });
             process.stdout.write(statusline);
             globals.convergence.push(ratioString);
           }
-        }
-      } // End of optimization loop.
+        } // End statistics
 
-      globals.time.generateCryptopt = (Date.now() - optimistaionStartDate) / 1000 - globals.time.validate;
-      // Generate statistics as ASM comments.
-      let statistics: string[];
-      {
-        const elapsed = Date.now() - optimistaionStartDate;
-        const paddedSeed = padSeed(Paul.initialSeed);
-        statistics = genStatistics({
-          paddedSeed,
-          ratioString,
-          evals: this.args.evals,
-          elapsed,
-          batchSize: this.msOpts.batchSize,
-          numBatches: this.msOpts.numBatches,
-          acc: this.accumulatedTimeSpentByMeasuring,
-          numRevert: this.numRevert,
-          numMut: this.numMut,
-          counter: this.measuresuite.timer,
-          framePointer: this.args.framePointer,
-          memoryConstraints: this.args.memoryConstraints,
-          cyclegoal: this.args.cyclegoal,
-        });
-        Logger.log(statistics);
-      }
+        this.currentIter++;
+        // Start cleanup
+        {
+          if (this.currentIter >= this.nIter) {
+            globals.time.generateCryptopt =
+              (Date.now() - optimistaionStartDate) / 1000 - globals.time.validate;
+            clearInterval(intervalHandle);
+            // Generate statistics as ASM comments.
+            let statistics: string[];
+            const elapsed = Date.now() - optimistaionStartDate;
+            const paddedSeed = padSeed(Paul.initialSeed);
+            statistics = genStatistics({
+              paddedSeed,
+              ratioString,
+              evals: this.args.evals,
+              elapsed,
+              batchSize: this.msOpts.batchSize,
+              numBatches: this.msOpts.numBatches,
+              acc: this.accumulatedTimeSpentByMeasuring,
+              numRevert: this.numRevert,
+              numMut: this.numMut,
+              counter: this.measuresuite.timer,
+              framePointer: this.args.framePointer,
+              memoryConstraints: this.args.memoryConstraints,
+              cyclegoal: this.args.cyclegoal,
+            });
+            Logger.log(statistics);
 
-      // Generate filenames for final results.
-      const [asmFile, mutationsCsvFile] = generateResultFilename(
-        { ...this.args, symbolname: this.symbolname },
-        [`_ratio${ratioString.replace(".", "")}.asm`, `.csv`],
-      );
-      // Write out the final optimized assembly program, mutation log, & statistics.
-      {
-        // write best found solution with headers
-        // flip, because we want the last accepted, not the last mutated.
-        const flipped = toggleFUNCTIONS(currentFunction);
+            // Generate filenames for final results.
+            const [asmFile, mutationsCsvFile] = generateResultFilename(
+              { ...this.args, symbolname: this.symbolname },
+              [`_ratio${ratioString.replace(".", "")}.asm`, `.csv`],
+            );
+            // Write out the final optimized assembly program, mutation log, & statistics.
+            {
+              // write best found solution with headers
+              // flip, because we want the last accepted, not the last mutated.
+              const flipped = toggleFUNCTIONS(currentFunction);
 
-        writeString(
-          asmFile,
-          ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
-            .concat(this.asmStrings[flipped])
-            .concat(statistics)
-            .join("\n"),
-        );
+              writeString(
+                asmFile,
+                ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
+                  .concat(this.asmStrings[flipped])
+                  .concat(statistics)
+                  .join("\n"),
+              );
 
-        writeString(mutationsCsvFile, globals.mutationLog.join("\n"));
-      }
+              writeString(mutationsCsvFile, globals.mutationLog.join("\n"));
+            }
 
-      // Optionally prove correctness via fiat.
-      {
-        if (shouldProve(this.args)) {
-          const proofCmd = FiatBridge.buildProofCommand(this.args.curve, this.args.method, asmFile);
-          Logger.log(`proving that asm is correct with '${proofCmd}'`);
-          try {
-            const now = Date.now();
-            execSync(proofCmd, { shell: "/usr/bin/bash" });
-            const timeForValidation = (Date.now() - now) / 1000;
-            appendFileSync(asmFile, `\n; validated in ${timeForValidation}s\n`);
-            globals.time.validate += timeForValidation;
-          } catch (e) {
-            console.error(`tried to prove correct. didnt work. I tried ${proofCmd}`);
-            errorOut(ERRORS.proofUnsuccessful);
+            // Optionally prove correctness via fiat.
+            {
+              if (shouldProve(this.args)) {
+                const proofCmd = FiatBridge.buildProofCommand(this.args.curve, this.args.method, asmFile);
+                Logger.log(`proving that asm is correct with '${proofCmd}'`);
+                try {
+                  const now = Date.now();
+                  execSync(proofCmd, { shell: "/usr/bin/bash" });
+                  const timeForValidation = (Date.now() - now) / 1000;
+                  appendFileSync(asmFile, `\n; validated in ${timeForValidation}s\n`);
+                  globals.time.validate += timeForValidation;
+                } catch (e) {
+                  console.error(`tried to prove correct. didnt work. I tried ${proofCmd}`);
+                  errorOut(ERRORS.proofUnsuccessful);
+                }
+              }
+            }
+            Logger.log("done with that current price of assembly code.");
+            this.cleanLibcheckfunctions();
+            const v = this.measuresuite.destroy();
+            Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
+            resolve(0);
           }
-        }
-      }
-
-      // Done.
-      resolve(0);
+        } // End cleanup
+      }, 0);
     });
   }
 }

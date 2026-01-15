@@ -56,7 +56,6 @@ if (parsedArgs.startFromBestJson) {
   if (existsSync(bestStateFileName)) {
     // overwrite all args
     parsedArgs = bestState.parsedArgs;
-
     // restore some
     parsedArgs.readState = bestStateFileName;
     parsedArgs.single = true;
@@ -87,14 +86,6 @@ if (!verbose) {
   console.log = () => {
     // intentionally empty
   };
-}
-
-// Probably bet stage works with SA, but disable it for now.
-if (!parsedArgs.single && parsedArgs.optimizer != "rls") {
-  Logger.log(
-    `Optimizer strategy ${parsedArgs.optimizer} does not support bet-stage, setting single-run mode.`,
-  );
-  parsedArgs.single = true;
 }
 
 // Idea is: if you want debug messages, you want to compile with DEBUG and run with --verbose,
@@ -202,14 +193,13 @@ process.stdout.write(
   `\nBest cycle count: ${globals.bestEpoch.result!.batchSizeScaledrawMedian[globals.bestEpoch.indexGood].toFixed(0)} (epoch=${globals.bestEpoch.epoch})\n`,
 );
 process.stdout.write(`Run result: ${JSON.stringify(runResults[runResults.length - 1].mutationStats)}\n`);
-process.stdout.write(`Convergence: ${runResults[runResults.length - 1].convergence}\n`);
+process.stdout.write(`Ratio: ${globals.currentRatio}\n`);
 
 // NOW Analyse and write files for graphing.
 
 const times: CryptoptGlobals["time"] = { validate: 0, generateCryptopt: 0, generateFiat: 0 };
 
 const parsed = Model.getState();
-
 if ("time" in parsed) {
   const { validate, generateCryptopt, generateFiat } = parsed.time;
   times.validate += validate;

@@ -42,3 +42,13 @@ Bun.build({
     }),
   ],
 });
+
+// Build scripts & measurement tools.
+Bun.build({
+  tsconfig: tsconfigPath,
+  entrypoints: ["./scripts/GraphMutatedVariants.ts"],
+  target: "node",
+  minify: !debug,
+  outdir: "dist",
+  external: ["*.node"],
+});

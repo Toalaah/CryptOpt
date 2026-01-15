@@ -77,10 +77,16 @@ export const parsedArgs = y
   })
   .option("saVisitParam", {
     number: true,
-    default: 1.62,
+    default: 1.6,
     min: 1 + Number.EPSILON,
     describe:
       "Controls the visit parameter for tuning the cooling schedule. Lower values stetch the cooling tail. Must be strictly greater than one. (has no effect if optimizer is not set to 'sa').",
+  })
+  .option("saEnergyParam", {
+    number: true,
+    default: 1.0,
+    min: Number.EPSILON,
+    describe: "Energy scale factor (has no effect if optimizer is not set to 'sa').",
   })
   .option("saAcceptParam", {
     number: true,

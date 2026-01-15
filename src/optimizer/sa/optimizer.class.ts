@@ -1,4 +1,4 @@
-import { OptimizerArgs, SA_NEIGHBOR_STRATEGY_T } from "@/types";
+import { OptimizerArgs } from "@/types";
 import { Optimizer } from "@/optimizer";
 import Logger from "@/helper/Logger.class";
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "@/optimizer/util";
@@ -22,8 +22,6 @@ import { FiatBridge } from "@/bridge/fiat-bridge";
 import { errorOut, ERRORS } from "@/errors";
 import { execSync } from "child_process";
 import { appendFileSync } from "fs";
-import assert from "assert";
-import { each } from "lodash-es";
 import { sum } from "simple-statistics";
 
 export class SAOptimizer extends Optimizer {
@@ -36,6 +34,7 @@ export class SAOptimizer extends Optimizer {
   private initialTemperature: number;
   private acceptParam: number;
   private visitParam: number;
+  private energyParam: number;
   private neighborSelectionFunc: NeighborSelectionFunc<number>;
 
   private coolingSchedule: CoolingSchedule;
@@ -50,6 +49,7 @@ export class SAOptimizer extends Optimizer {
 
     this.acceptParam = this.args.saAcceptParam;
     this.visitParam = this.args.saVisitParam;
+    this.energyParam = this.args.saEnergyParam;
     this.initialTemperature = this.args.saInitialTemperature;
 
     switch (this.args.saNeighborStrategy) {
@@ -112,7 +112,7 @@ export class SAOptimizer extends Optimizer {
 
   // TODO: should this be somehow scaled?
   private energy(x: number): number {
-    return x;
+    return x * this.energyParam;
   }
 
   private updateBatchSize(meanRaw: number) {
@@ -129,7 +129,6 @@ export class SAOptimizer extends Optimizer {
         symbolname: this.symbolname,
         counter: this.measuresuite.timer,
       });
-
       const optimistaionStartDate = Date.now();
       let ratioString = "";
       let currentFunction = FUNCTIONS.F_A;

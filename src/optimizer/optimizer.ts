@@ -93,7 +93,7 @@ export abstract class Optimizer {
     this.no_of_instructions = -1;
     // load a saved state if necessary
     if (args.readState) {
-      Model.import(args.readState);
+      Model.restoreFromFile(args.readState);
     }
 
     RegisterAllocator.options = args;

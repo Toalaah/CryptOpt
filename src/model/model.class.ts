@@ -40,7 +40,7 @@ import { BIAS, Paul } from "@/paul";
 import type { CryptOpt, MEMORY_CONSTRAINTS_OPTIONS_T } from "@/types";
 
 import { createDependencyRelation, nodeLookupMap } from "./model.helper";
-
+type modelState = ReturnType<typeof Model.getState> & { parsedArgs: CryptOpt.StateFile["parsedArgs"] };
 type methodParam = CryptOpt.Function["arguments"][number] | CryptOpt.Function["returns"][number];
 export class Model {
   // this is set once.
@@ -55,6 +55,7 @@ export class Model {
   // i.e.: function_test(*...returns.map({name}),*...arguments.map({name}) )
   private static _methodParameters: Array<methodParam> = [];
   private static _instance: null | Model = null;
+  private static _snapshots = new Map<string, modelState>();
   public static permutationStats = "";
   public static decisionStats = "";
   public static hardDependencies = new Set<string>();
@@ -85,34 +86,51 @@ export class Model {
     };
   }
 
+  private static serialize(parsedArgs: CryptOpt.StateFile["parsedArgs"]): modelState {
+    return {
+      ...Model.getState(),
+      parsedArgs,
+    };
+  }
+
+  public static saveSnaphot(id: string, parsedArgs: CryptOpt.StateFile["parsedArgs"]) {
+    Logger.log(`Saving model snapshot: '${id}'`);
+    this._snapshots.set(id, Model.serialize(parsedArgs));
+  }
+
   public static persist(filename: fs.PathLike, parsedArgs: CryptOpt.StateFile["parsedArgs"]) {
-    fs.writeFileSync(
-      filename,
-      JSON.stringify({
-        ...Model.getState(),
-        parsedArgs,
-      }),
-    );
+    fs.writeFileSync(filename, JSON.stringify(Model.serialize(parsedArgs)));
     filename = filename.toString();
     if (filename.includes("results")) {
       filename = "RES" + filename.split("results")[1];
     }
-    process.stdout.write(`\nWrote ${cy}${filename}${re}\n`);
+    process.stdout.write(`Wrote ${cy}${filename}${re}\n`);
   }
 
-  public static import(filename: fs.PathLike) {
-    const parsed = JSON.parse(fs.readFileSync(filename).toString());
-    const { to, body, seed, convergence } = parsed;
+  public static restore(state: modelState) {
+    Logger.log(`Restoring model: ${JSON.stringify(state)}`);
+    const { to, body, seed, convergence } = state;
     const m = Model.getInstance();
     Model._order = to;
     Model._nodes = body;
     Paul.seed = seed;
     globals.convergence = convergence;
-    if ("time" in parsed) {
-      globals.time = parsed.time;
+    if ("time" in state) {
+      globals.time = state.time;
     }
     m._currentReadOrderIsValid = false;
     m.backupbody();
+  }
+
+  public static restoreFromSnapshot(id: string) {
+    if (!Model._snapshots.has(id)) throw new Error(`no such snapshot: ${id}`);
+    const parsed = Model._snapshots.get(id)!;
+    Model.restore(parsed);
+  }
+
+  public static restoreFromFile(filename: fs.PathLike) {
+    const parsed = JSON.parse(fs.readFileSync(filename).toString()) as modelState;
+    Model.restore(parsed);
   }
 
   public static init({

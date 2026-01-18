@@ -50,6 +50,15 @@ export abstract class Optimizer {
 
   protected choice: CHOICE;
 
+  protected updateNumRevert(revertChoice: CHOICE) {
+    switch (revertChoice) {
+      case CHOICE.PERMUTE:
+        this.numRevert.permutation++;
+      case CHOICE.DECISION:
+        this.numRevert.decision++;
+    }
+  }
+
   protected handleMeasurementError(e: any): never {
     const isIncorrect = e instanceof Error && e.message.includes("tested_incorrect");
     const isInvalid = e instanceof Error && e.message.includes("could not be assembled");

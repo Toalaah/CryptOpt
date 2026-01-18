@@ -16,27 +16,27 @@
 
 import type { MeasureResult } from "measuresuite";
 
-export type numTripel = [cyclesA: number, cyclesB: number, cyclesC: number];
+// export type numTripel = [cyclesA: number, cyclesB: number, cyclesC: number];
 
 export type QuickStats = { median: number; stddev: number; n: number };
 
 export interface AnalyseResult {
   // the raw median, without removing outliers
-  rawMedian: numTripel;
+  rawMedian: number[];
   // variance in that distribution
-  rawStddev: numTripel;
+  rawStddev: number[];
   // scaled by batch_size. so those are the medians per single execution
-  batchSizeScaledrawMedian: numTripel;
-  batchSizeScaledrawStddev: numTripel;
+  batchSizeScaledrawMedian: number[];
+  batchSizeScaledrawStddev: number[];
   // same as above, but the medians are based on the distribution with removed outliers.
-  noOutlierMedian: numTripel;
-  noOutlierStddev: numTripel;
-  noOutlierBatchSizeScaledMedian: numTripel;
-  noOutlierBatchSizeScaledStddev: numTripel;
+  noOutlierMedian: number[];
+  noOutlierStddev: number[];
+  noOutlierBatchSizeScaledMedian: number[];
+  noOutlierBatchSizeScaledStddev: number[];
 
-  numOutliers: numTripel;
+  numOutliers: number[];
 
-  chunks: [chunksA: number, chunksB: number];
+  chunks: number[];
 
   correct: boolean;
   rawResult: MeasureResult; // hopefully just for debug/dev purposes

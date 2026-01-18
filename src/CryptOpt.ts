@@ -142,7 +142,7 @@ async function allBets(evals: number, bets: number): Promise<RunResult[]> {
   return runRes;
 }
 
-async function run(args: OptimizerArgs): Promise<RunResult> {
+async function run(args: ParsedArgsT): Promise<RunResult> {
   let optimizer: Optimizer;
   try {
     optimizer = OptimizerFactory.make(args);
@@ -261,6 +261,8 @@ writeString(
     `plot "${datFileFull}" matrix using ($1*${PRINT_EVERY}):3:2 linecolor variable with lines, 1 lc 0`,
   ].join("\n"),
 );
+
+FileLogger.close();
 
 process.stdout.write("Gen Pdf...");
 const d = (chunk: Buffer | string) => {

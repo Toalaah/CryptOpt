@@ -31,4 +31,4 @@ cd "${INSTALLDIR}"
 #   "./dist/CryptOpt.js" "${@}"
 #
 #run
-node ./dist/CryptOpt.js "${@}"
+exec node ./dist/CryptOpt.js "${@}"

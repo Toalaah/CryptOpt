@@ -19,13 +19,7 @@ import type { AsmFunctionSummary } from "measuresuite";
 import * as Stats from "simple-statistics";
 
 import { errorOut, ERRORS } from "@/errors";
-import type {
-  AnalyseMeasureResultOptions,
-  AnalyseResult,
-  MeasureResult,
-  numTripel,
-  QuickStats,
-} from "@/types";
+import type { AnalyseMeasureResultOptions, AnalyseResult, MeasureResult, QuickStats } from "@/types";
 
 /**
  * @param result - the result to analyse
@@ -59,33 +53,37 @@ export function analyseMeasureResult(
     errorOut(ERRORS.measureInsufficientData);
   }
 
-  const [cc, ca, cb] = result.cycles.map(analyseRow);
-  const rawMedian: numTripel = [ca.pre.median, cb.pre.median, cc.pre.median];
+  // result.cycles.map(analyseRow) => [c_check, ca, cb, cc, ...] => [ca, cb, cc, ..., c_check]
+  const cycles = (() => {
+    const cycles = result.cycles.map(analyseRow);
+    const first = cycles.shift()!;
+    return [...cycles, first];
+  })();
 
+  const rawMedian: numTripel = cycles.map((c) => c.pre.median);
   if (rawMedian.some(isNaN)) {
     console.error("TSNH. Some mean is NaN." + JSON.stringify(result));
     process.exit(4);
   }
 
-  const rawStddev: numTripel = [ca.pre.stddev, cb.pre.stddev, cc.pre.stddev];
-  const noOutlierMedian: numTripel = [ca.post.median, cb.post.median, cc.post.median];
-
-  const noOutlierStddev: numTripel = [ca.post.stddev, cb.post.stddev, cc.post.stddev];
+  const rawStddev = cycles.map((c) => c.pre.stddev);
+  const noOutlierMedian = cycles.map((c) => c.post.median);
+  const noOutlierStddev = cycles.map((c) => c.post.stddev);
 
   const scale = (cyc: number): number => cyc / options.batchSize;
 
   return {
     rawMedian,
     rawStddev,
-    batchSizeScaledrawMedian: rawMedian.map(scale) as numTripel,
-    batchSizeScaledrawStddev: rawStddev.map(scale) as numTripel,
+    batchSizeScaledrawMedian: rawMedian.map(scale),
+    batchSizeScaledrawStddev: rawStddev.map(scale),
 
     noOutlierMedian,
     noOutlierStddev,
-    noOutlierBatchSizeScaledMedian: noOutlierMedian.map(scale) as numTripel,
-    noOutlierBatchSizeScaledStddev: noOutlierStddev.map(scale) as numTripel,
+    noOutlierBatchSizeScaledMedian: noOutlierMedian.map(scale),
+    noOutlierBatchSizeScaledStddev: noOutlierStddev.map(scale),
 
-    numOutliers: [ca.pre.n - ca.post.n, ca.pre.n - ca.post.n, ca.pre.n - ca.post.n],
+    numOutliers: cycles.map((c) => c.pre.n - c.post.n),
 
     chunks: result.functions
       .filter(({ type }) => type == "ASM")

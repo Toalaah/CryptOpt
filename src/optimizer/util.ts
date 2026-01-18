@@ -44,7 +44,7 @@ export function genStatusLine(a: {
   ratioString: string;
   show_per_second: string;
 }): string {
-  const cyclDeltaR = Math.abs(a.analyseResult.rawMedian[0] - a.analyseResult.rawMedian[1])
+  const cyclDeltaR = Math.abs(a.analyseResult.rawMedian[a.indexGood] - a.analyseResult.rawMedian[a.indexBad])
     .toString()
     .padStart(6);
 

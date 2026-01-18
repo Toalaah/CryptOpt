@@ -139,7 +139,7 @@ export class Paul {
   }
 
   public static chooseWithProbabilities(probabilities: number[]): number {
-    if (sum(probabilities) !== 1) throw new Error("invalid probabily distribution");
+    if (1 - sum(probabilities) > Number.EPSILON) throw new Error("invalid probabily distribution");
     let choice = Math.random();
     const retIndex = probabilities.findIndex((pr) => {
       choice -= pr;

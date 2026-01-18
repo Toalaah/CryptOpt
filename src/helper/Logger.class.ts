@@ -44,9 +44,10 @@ export class FileLogger {
     }
   }
 
-  public static stop(): void {
+  public static close(): void {
     if (!FileLogger._instance) return;
     clearInterval(FileLogger.interval);
     FileLogger.flush();
+    FileLogger._instance = null;
   }
 }

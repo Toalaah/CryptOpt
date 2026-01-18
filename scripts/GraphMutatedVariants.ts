@@ -58,7 +58,7 @@ let baseAsm = (() => {
 const results: number[][] = new Array(max_y).fill(0).map(() => new Array(max_x).fill(0));
 
 for (let y = 0; y < max_y; ++y) {
-  Model.saveSnaphot("tmp", parsedArgs);
+  Model.saveSnaphot("tmp");
   for (let x = 0; x < max_x; ++x) {
     if (y === 0 && x === 0) {
       continue;
@@ -72,7 +72,7 @@ for (let y = 0; y < max_y; ++y) {
     const [meanRawBase, meanRawMut] = analyzeResult.rawMedian;
     results[y][x] = meanRawMut / meanRawBase;
   }
-  Model.restoreFromSnapshot("tmp");
+  Model.restoreSnapshot("tmp");
   mutate(CHOICE.DECISION);
 }
 

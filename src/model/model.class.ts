@@ -39,6 +39,8 @@ import { Logger } from "@/helper/Logger.class";
 import { BIAS, Paul } from "@/paul";
 import type { CryptOpt, MEMORY_CONSTRAINTS_OPTIONS_T } from "@/types";
 
+type Backup = { nodes: Readonly<CryptOpt.StringOperation>[]; order: number[] };
+
 import { createDependencyRelation, nodeLookupMap } from "./model.helper";
 type modelState = ReturnType<typeof Model.getState> & { parsedArgs: CryptOpt.StateFile["parsedArgs"] };
 type methodParam = CryptOpt.Function["arguments"][number] | CryptOpt.Function["returns"][number];
@@ -55,7 +57,6 @@ export class Model {
   // i.e.: function_test(*...returns.map({name}),*...arguments.map({name}) )
   private static _methodParameters: Array<methodParam> = [];
   private static _instance: null | Model = null;
-  private static _snapshots = new Map<string, modelState>();
   public static permutationStats = "";
   public static decisionStats = "";
   public static hardDependencies = new Set<string>();
@@ -86,20 +87,14 @@ export class Model {
     };
   }
 
-  private static serialize(parsedArgs: CryptOpt.StateFile["parsedArgs"]): modelState {
-    return {
-      ...Model.getState(),
-      parsedArgs,
-    };
-  }
-
-  public static saveSnaphot(id: string, parsedArgs: CryptOpt.StateFile["parsedArgs"]) {
-    Logger.log(`Saving model snapshot: '${id}'`);
-    this._snapshots.set(id, Model.serialize(parsedArgs));
-  }
-
   public static persist(filename: fs.PathLike, parsedArgs: CryptOpt.StateFile["parsedArgs"]) {
-    fs.writeFileSync(filename, JSON.stringify(Model.serialize(parsedArgs)));
+    fs.writeFileSync(
+      filename,
+      JSON.stringify({
+        ...Model.getState(),
+        parsedArgs,
+      }),
+    );
     filename = filename.toString();
     if (filename.includes("results")) {
       filename = "RES" + filename.split("results")[1];
@@ -120,12 +115,6 @@ export class Model {
     }
     m._currentReadOrderIsValid = false;
     m.backupbody();
-  }
-
-  public static restoreFromSnapshot(id: string) {
-    if (!Model._snapshots.has(id)) throw new Error(`no such snapshot: ${id}`);
-    const parsed = Model._snapshots.get(id)!;
-    Model.restore(parsed);
   }
 
   public static restoreFromFile(filename: fs.PathLike) {
@@ -404,14 +393,44 @@ export class Model {
     return true;
   }
 
-  private backup: { nodes: Readonly<CryptOpt.StringOperation>[]; order: number[] } = {
+  private snapshots: { [key: string]: Backup } = {};
+
+  private _saveSnaphot(id: string) {
+    Logger.log(`Saving model snapshot: '${id}'`);
+    const nodes = cloneDeep(Model._nodes);
+    const order = cloneDeep(Model._order);
+    this.snapshots[id] = { nodes, order };
+  }
+
+  public static saveSnaphot(id: string) {
+    const m = Model.getInstance();
+    m._saveSnaphot(id);
+  }
+
+  private _restoreSnapshot(id: string) {
+    const state = this.snapshots[id];
+    Logger.log(`Restoring model snapshot: '${id}' (${state})`);
+    if (state === undefined) return;
+    Model._nodes = state.nodes;
+    Model._order = state.order;
+    this._currentReadOrderIsValid = false;
+  }
+
+  public static restoreSnapshot(id: string) {
+    const m = Model.getInstance();
+    m._restoreSnapshot(id);
+  }
+
+  private backup: Backup = {
     nodes: [],
     order: [],
   };
+
   private loadbackupbody(): void {
     Model._nodes = this.backup.nodes;
     Model._order = this.backup.order;
   }
+
   private backupbody(): void {
     this.backup.nodes = cloneDeep(Model._nodes);
     this.backup.order = cloneDeep(Model._order);
@@ -499,6 +518,7 @@ export class Model {
     // and initializing the pointer.
     Model._currentInstIdx = -1;
   }
+
   public static nextOperation(): CryptOpt.StringOperation | null {
     if (Model._currentInstIdx < Model._order.length) {
       const nextIdx = this._order[++Model._currentInstIdx];

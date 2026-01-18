@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-import { OptimizerArgs } from "@/types";
+import { ParsedArgsT } from "@/types";
 import { SAOptimizer } from "@/optimizer/sa";
 import { RLSOptimizer } from "@/optimizer/rls";
 import { Optimizer } from "@/optimizer";
 
 export class OptimizerFactory {
-  public static make(args: OptimizerArgs): Optimizer {
+  public static make(args: ParsedArgsT): Optimizer {
     switch (args.optimizer) {
       case "rls":
         return new RLSOptimizer(args);

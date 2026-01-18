@@ -1,8 +1,7 @@
 import { OptimizerArgs } from "@/types";
 import { Optimizer } from "@/optimizer";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "@/optimizer/util";
-import { FUNCTIONS } from "@/enums";
 import { resolve as pathResolve } from "path";
 
 import {

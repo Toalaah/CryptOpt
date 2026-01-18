@@ -35,10 +35,12 @@ import { registerExitHooks } from "@/helper/process";
 import { Model } from "@/model";
 import { OptimizerFactory, Optimizer } from "@/optimizer";
 import { sha1Hash } from "@/paul";
-import type { CryptOpt, CryptoptGlobals, OptimizerArgs } from "@/types";
+import type { CryptOpt, CryptoptGlobals, ParsedArgsT } from "@/types";
 
-import Logger from "./helper/Logger.class";
+import { Logger, FileLogger } from "./helper/Logger.class";
 import globals from "./helper/globals";
+
+FileLogger.init();
 
 let parsedArgs = parsedArgsFromCli;
 if (parsedArgs.startFromBestJson) {

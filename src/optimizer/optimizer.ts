@@ -15,7 +15,7 @@
  */
 
 import { OptimizerArgs } from "@/types";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { Paul, sha1Hash } from "@/paul";
 import { existsSync, rmSync } from "fs";
 import { Measuresuite } from "measuresuite";

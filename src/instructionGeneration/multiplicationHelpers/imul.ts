@@ -15,7 +15,7 @@
  */
 
 import { AllocationFlags, Flags, FlagState } from "@/enums";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { RegisterAllocator } from "@/registerAllocator";
 import type { asm, CryptOpt } from "@/types";
 

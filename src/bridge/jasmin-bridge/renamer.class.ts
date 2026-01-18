@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { isXD } from "@/helper";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { CryptOpt, Fiat } from "@/types";
 
 const ARRAY_REG = /(?<base>[\w.]+)\[u64 (?<off>\d+) \]/;

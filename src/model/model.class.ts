@@ -35,7 +35,7 @@ import {
   toposort,
 } from "@/helper";
 import globals from "@/helper/globals";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { BIAS, Paul } from "@/paul";
 import type { CryptOpt, MEMORY_CONSTRAINTS_OPTIONS_T } from "@/types";
 

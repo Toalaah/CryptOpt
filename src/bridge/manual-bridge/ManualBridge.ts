@@ -18,7 +18,7 @@ import { execSync } from "child_process";
 import { existsSync, readFileSync } from "fs";
 
 import { env, matchArg, preprocessFunction } from "@/helper";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import type { CryptOpt } from "@/types";
 
 import { Bridge } from "../bridge.interface";

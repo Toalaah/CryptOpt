@@ -26,7 +26,7 @@ import {
   DECISION_IDENTIFIER,
   Flags,
 } from "@/enums";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { Paul } from "@/paul/Paul.class";
 import type { CryptOpt, Fiat } from "@/types";
 

@@ -23,7 +23,7 @@ import {
   Register,
 } from "@/enums";
 import { isByteRegister, isXmmRegister, limbify, matchIMM, TEMP_VARNAME, zx } from "@/helper";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { Paul } from "@/paul";
 import { RegisterAllocator } from "@/registerAllocator";
 import type { asm, CryptOpt } from "@/types";

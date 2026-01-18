@@ -19,7 +19,7 @@ import { resolve } from "path";
 
 import { errorOut, ERRORS } from "@/errors";
 import { datadir, env, preprocessFunction } from "@/helper";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import type { CryptOpt } from "@/types";
 
 import { lockAndRunOrReturn } from "../bridge.helper";

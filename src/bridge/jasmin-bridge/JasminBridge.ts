@@ -19,7 +19,7 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
 
 import { datadir, env, preprocessFunction } from "@/helper";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { CryptOpt } from "@/types";
 
 import { Converter } from "./converter";
@@ -57,8 +57,9 @@ export class JasminBridge {
   constructor() {
     const rawLines = readFileSync(resolve(cwd, "makeref")).toString().split("\n");
 
-    const matchGroups = rawLines[0].match(/fn (?<name>\w+) \((?<params>(reg u64 [\w.]+,? ?)+)\) -> \(\) {/)
-      ?.groups;
+    const matchGroups = rawLines[0].match(
+      /fn (?<name>\w+) \((?<params>(reg u64 [\w.]+,? ?)+)\) -> \(\) {/,
+    )?.groups;
     if (!matchGroups) {
       throw new Error("unsupported function signature");
     }

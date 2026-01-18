@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { Fiat } from "@/types";
 
 import { Renamer } from "./renamer.class";

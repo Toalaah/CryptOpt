@@ -19,7 +19,7 @@ import { resolve } from "path";
 
 import { errorOut, ERRORS } from "@/errors";
 import { datadir, env, preprocessFunction } from "@/helper";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { sha256Hash } from "@/paul";
 import type { CryptOpt, Fiat } from "@/types";
 

@@ -60,7 +60,7 @@ import {
   toMem,
   zx,
 } from "@/helper/lamdas";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { getByteRegFromQwReg, getQwRegFromByteReg } from "@/helper/reg-conversion";
 import { Model } from "@/model";
 import { Paul } from "@/paul";

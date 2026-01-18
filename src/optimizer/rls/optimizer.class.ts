@@ -33,7 +33,7 @@ import {
   writeString,
 } from "@/helper";
 import globals from "@/helper/globals";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { Model } from "@/model";
 import type { AnalyseResult, OptimizerArgs } from "@/types";
 

@@ -15,7 +15,7 @@
  */
 
 import { writeString } from "@/helper";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import { getInstruction } from "@/instructionGeneration/InstructionGenerator";
 import { Model } from "@/model";
 import { RegisterAllocator } from "@/registerAllocator";

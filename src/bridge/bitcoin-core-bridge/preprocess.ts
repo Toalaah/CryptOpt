@@ -17,7 +17,7 @@
 import { groupBy } from "lodash-es";
 
 import { matchArgPrefix } from "@/helper";
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import type { Fiat } from "@/types";
 
 import { getArguments } from "./helpers";

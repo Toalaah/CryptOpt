@@ -17,7 +17,7 @@
 import { existsSync, mkdirSync } from "fs";
 import { resolve } from "path";
 
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 import type { OptimizerArgs } from "@/types";
 
 import { padSeed } from "./lamdas";

@@ -2,7 +2,7 @@ import type { ExecSyncOptions } from "child_process";
 import { execSync } from "child_process";
 import { checkSync, lockSync } from "proper-lockfile";
 
-import Logger from "@/helper/Logger.class";
+import { Logger } from "@/helper/Logger.class";
 // if we dont get the lock, this function will wait until the lock is gone and return.
 export function lockAndRunOrReturn(filename: string, cmd: string, opts: ExecSyncOptions = {}): void {
   try {

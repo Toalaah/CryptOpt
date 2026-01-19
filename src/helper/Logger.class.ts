@@ -23,7 +23,7 @@ export class FileLogger {
   public static init(logFile: string = "/tmp/CryptOpt.log", flushIntervalMs: number = 500) {
     FileLogger.getInstance(); // Ensure instance exists to properly register cleanup task.
     FileLogger.logFile = logFile;
-    fs.truncateSync(FileLogger.logFile, 0);
+    if (fs.existsSync(FileLogger.logFile)) fs.truncateSync(FileLogger.logFile, 0);
     FileLogger.interval = setInterval(() => FileLogger.flush(), flushIntervalMs);
   }
 

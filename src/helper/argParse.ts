@@ -104,7 +104,18 @@ export const parsedArgs = y
     min: 1,
     default: 1,
     describe:
-      "Number of neighbors to sample in  each epoch. Note that this only has an effect if saNeighborStrategy=weighted.",
+      "Number of neighbors to sample in each epoch. Note that this only has an effect if saNeighborStrategy=weighted.",
+  })
+  .option("saStepSizeParam", {
+    number: true,
+    default: 712,
+    describe: "Step size parameter value (has no effect if optimizer is not set to 'sa').",
+  })
+  .option("saMaxMutStepSize", {
+    number: true,
+    default: -1,
+    describe:
+      "Maximum step size of mutations to perform when sampling a new neighbor. Higher values allow the optimizer to navigate the search space more quickly, at the expense of less local search. Values <= 0 imply an unrestricted maximum step size.",
   })
   .option("saCoolingSchedule", {
     string: true,

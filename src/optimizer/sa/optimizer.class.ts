@@ -1,6 +1,6 @@
 import { OptimizerArgs } from "@/types";
 import { Optimizer } from "@/optimizer";
-import { Logger } from "@/helper/Logger.class";
+import { FileLogger, Logger } from "@/helper/Logger.class";
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "@/optimizer/util";
 import { resolve as pathResolve } from "path";
 
@@ -23,6 +23,7 @@ import { appendFileSync } from "fs";
 import { sum } from "simple-statistics";
 import { Model } from "@/model";
 import { CHOICE } from "@/enums";
+import { cauchy } from "@/paul/distributions";
 
 export class SAOptimizer extends Optimizer {
   // Number of iterations to perform during optimization.
@@ -31,12 +32,14 @@ export class SAOptimizer extends Optimizer {
   private accumulatedTimeSpentByMeasuring: number;
   // Optimizer-specific args
   private initialTemperature: number;
+  private maxMutationStepSize: number; // Maximum number of "steps" a single candidate shall take. Depends also on the current temperature.
   private acceptParam: number;
   private visitParam: number;
+  private stepSizeParam: number;
   private energyParam: number;
   private numNeighbors: number;
   private neighborSelectionFunc: NeighborSelectionFunc<number>;
-  private candidates: Array<{ asm: string; stacklength: number; choice: CHOICE }>;
+  private candidates: Array<{ asm: string; stacklength: number; choice: CHOICE; ninst: number }>;
 
   private coolingSchedule: CoolingSchedule;
 
@@ -49,7 +52,9 @@ export class SAOptimizer extends Optimizer {
 
     this.acceptParam = this.args.saAcceptParam;
     this.visitParam = this.args.saVisitParam;
+    this.stepSizeParam = this.args.saStepSizeParam;
     this.numNeighbors = this.args.saNumNeighbors;
+    this.maxMutationStepSize = Math.round(this.args.saMaxMutStepSize);
     this.energyParam = this.args.saEnergyParam;
     this.initialTemperature = this.args.saInitialTemperature;
     // Index 0 is current function.
@@ -59,6 +64,7 @@ export class SAOptimizer extends Optimizer {
         asm: "",
         stacklength: -1,
         choice: this.choice,
+        ninst: -1,
       };
     }
 
@@ -121,7 +127,7 @@ export class SAOptimizer extends Optimizer {
     const assembleResult = assembleASM(this.args.resultDir);
     const code = assembleResult.code;
     const filteredInstructions = strip(code);
-    this.no_of_instructions = filteredInstructions.length;
+    if (slot === 0) this.no_of_instructions = filteredInstructions.length;
     const asm = (() => {
       switch (this.args.verbose) {
         case true:
@@ -135,11 +141,39 @@ export class SAOptimizer extends Optimizer {
     this.candidates[slot].asm = asm;
     this.candidates[slot].stacklength = assembleResult.stacklength;
     this.candidates[slot].choice = this.choice;
+    this.candidates[slot].ninst = filteredInstructions.length;
   }
 
   public optimise() {
+    /**
+     * Writes candidate `i`'s ASM to file.
+     */
+    const writeASMString = (slot: number) => {
+      writeString(
+        pathResolve(this.libcheckfunctionDirectory, `current${slot}.asm`),
+        // pathResolve(this.libcheckfunctionDirectory, `current${id(slot)}.asm`),
+        this.candidates[slot].asm,
+      );
+    };
+
+    /**
+     * Samples a neighbor and saves it into `slot`. The model snapshot is saved with an `id` of `slot.toString()`.
+     */
+    const sampleNeighbor = (slot: number, temp: number) => {
+      const numMuts = (() => {
+        const scaledTemp = temp / this.stepSizeParam;
+        const n = Math.round(cauchy({ loc: 1, scale: scaledTemp }));
+        if (this.maxMutationStepSize <= 0) return Math.max(n, 1);
+        return clamp(n, 1, this.maxMutationStepSize);
+      })();
+      FileLogger.log(`sampled neighbor ${slot} with step size of ${numMuts}`);
+      for (let i = 0; i < numMuts; ++i) this.mutate();
+      Model.saveSnaphot(slot.toString());
+      this.assemble(slot);
+    };
+
     return new Promise<number>((resolve) => {
-      Logger.log("starting rls optimisation");
+      FileLogger.log("starting rls optimisation");
       printStartInfo({
         ...this.args,
         symbolname: this.symbolname,
@@ -150,19 +184,9 @@ export class SAOptimizer extends Optimizer {
       let ratioString = "";
       let currentEpoch = 0;
       let time = Date.now();
+      let temp = 0;
       let showPerSecond = "many/s";
       let perSecondCounter = 0;
-
-      /**
-       * Writes candidate `i`'s ASM to file.
-       */
-      const writeASMString = (slot: number) => {
-        writeString(
-          pathResolve(this.libcheckfunctionDirectory, `current${slot}.asm`),
-          // pathResolve(this.libcheckfunctionDirectory, `current${id(slot)}.asm`),
-          this.candidates[slot].asm,
-        );
-      };
 
       // Before running the optimization loop, assemble the baseline program (at this point, no mutations have taken place).
       {
@@ -173,38 +197,24 @@ export class SAOptimizer extends Optimizer {
       }
 
       const intervalHandle = setInterval(() => {
+        temp = this.coolingSchedule(currentEpoch);
+        FileLogger.log(`epoch ${currentEpoch}, temp=${temp}`);
+
         // Mutation & candidate generation.
         {
           Model.saveSnaphot("0");
-          // const old = JSON.stringify(Model.getState());
-          // We need to generate a unique candidate for the number of neighbors we want to explore.
           for (let i = 1; i <= this.numNeighbors; ++i) {
-            // Perform mutation && assemble current candidate.
-            this.mutate();
-            // assert(JSON.stringify(Model.getState()) !== old);
-            // currentEpoch++;
-            Model.saveSnaphot(i.toString());
-            this.assemble(i);
-            // Model now holds original state once again.
+            sampleNeighbor(i, temp);
+            Model.restoreSnapshot("0");
           }
-          Model.restoreSnapshot("0");
         }
-
-        // writeString(
-        //   pathResolve(this.libcheckfunctionDirectory, `candidates.json`),
-        //   JSON.stringify(this.candidates, null, 2),
-        // );
-
-        // if (this.candidates[CURRENT_FUNCTION].asm == this.candidates[1].asm) {
-        //   errorOut({ exitCode: 1, msg: "bad" + currentEpoch });
-        // }
 
         // Analysis & neighbor selection.
         const analyseResult = (() => {
           try {
             if (this.args.verbose) this.candidates.forEach((_, i) => writeASMString(i));
             const now = Date.now();
-            Logger.log("comparing candidates");
+            FileLogger.log("comparing candidates");
             const results = this.measuresuite.measure(
               this.msOpts.batchSize,
               this.msOpts.numBatches,
@@ -212,7 +222,7 @@ export class SAOptimizer extends Optimizer {
             );
 
             this.accumulatedTimeSpentByMeasuring += Date.now() - now;
-            Logger.log("done with measurements for current iteration");
+            FileLogger.log("done with measurements for current iteration");
             return analyseMeasureResult(results, {
               batchSize: this.msOpts.batchSize,
               resultDir: this.args.resultDir,
@@ -224,10 +234,10 @@ export class SAOptimizer extends Optimizer {
 
         const meanrawCurrent = analyseResult.rawMedian[CURRENT_FUNCTION];
         const meanrawNeighbors = analyseResult.rawMedian.slice(1, analyseResult.rawMedian.length - 1);
-        Logger.log(`analyseResult: ${JSON.stringify(analyseResult.rawMedian)}`);
+        FileLogger.log(`analyseResult: ${JSON.stringify(analyseResult.rawMedian)}`);
         // + 1 cause index 0 is always the current ASM string.
         const neighborIdx = this.neighborSelectionFunc(meanrawNeighbors.map((x) => this.energy(x))) + 1;
-        Logger.log(`chose neighbor: ${neighborIdx}`);
+        FileLogger.log(`chose neighbor: ${neighborIdx}`);
         const meanrawCandidate = analyseResult.rawMedian[neighborIdx];
         const meanrawCheck = analyseResult.rawMedian[analyseResult.rawMedian.length - 1];
         this.updateBatchSize(meanrawCheck);
@@ -239,18 +249,19 @@ export class SAOptimizer extends Optimizer {
           (kept = this.shouldAccept(
             this.energy(meanrawCurrent),
             this.energy(meanrawCandidate),
-            this.coolingSchedule(currentEpoch),
+            temp,
             currentEpoch,
           ))
         ) {
-          Logger.log("keeping mutated candidate");
+          FileLogger.log("keeping mutated candidate");
           this.candidates[CURRENT_FUNCTION].asm = this.candidates[neighborIdx].asm;
           this.candidates[CURRENT_FUNCTION].stacklength = this.candidates[neighborIdx].stacklength;
           this.candidates[CURRENT_FUNCTION].choice = this.candidates[neighborIdx].choice;
+          this.candidates[CURRENT_FUNCTION].ninst = this.candidates[neighborIdx].ninst;
           Model.restoreSnapshot(neighborIdx.toString());
         } else {
           // Nothing needs to be done in this case, since we always pop the "current" state after exploring neighbors.
-          Logger.log("keeping current");
+          FileLogger.log("keeping current");
           this.choice = this.candidates[neighborIdx].choice;
           this.updateNumRevert(this.choice);
         }
@@ -288,7 +299,7 @@ export class SAOptimizer extends Optimizer {
           if (currentEpoch % PRINT_EVERY == 0) {
             const statusline = genStatusLine({
               ...this.args,
-              logComment: this.args.logComment + ` temp=${this.coolingSchedule(currentEpoch).toFixed(2)}`,
+              logComment: this.args.logComment + ` temp=${temp.toFixed(2)}`,
               analyseResult,
               badChunks,
               batchSize: this.msOpts.batchSize,

@@ -21,11 +21,12 @@ _arguments -S -s \
     '--saInitialTemperature=[Initial temperature value to use for annealing. Has no effect if optimizer strategy is NOT sa]:sa_temp:' \
     '--saNeighborStrategy=[Neighbor-selection strategy to use for SA. Has no effect if optimizer strategy is NOT sa]:neighborstrategy:->neighborstrategies' \
     '--saNumNeighbors=[Number of neighbors to sample when using weighted neighbor-selection]:sa_nneigh:' \
+    '--saMaxMutStepSize=[Maximum mutation step size to perform when sampling neighbors when using weighted neighbor-selection]:sa_maxstep:' \
     '--saCoolingSchedule=[Cooling schedule to employ when using SA optimizer. Has no effect if optimizer strategy is NOT sa]:coolingschedule:->coolingschedules' \
-    '--saEnergyParam=[Scaling factor for evaluation of SA candidate energy values. Has no effect if optimizer strategy is NOT sa]:sa_accpr:' \
+    '--saEnergyParam=[Scaling factor for evaluation of SA candidate energy values. Has no effect if optimizer strategy is NOT sa]:sa_epr:' \
     '--saAcceptParam=[Acceptance parameter factor for annealing candidate selection. Has no effect if optimizer strategy is NOT sa]:sa_accpr:' \
+    '--saStepSizeParam=[Mutation step size parameter factor. Has no effect if optimizer strategy is NOT sa]:sa_sspr:' \
     '--saVisitParam=[Visitng parameter factor for adjusting SA cooling schedule. Has no effect if optimizer strategy is NOT sa]:sa_visitpr:' \
-    '(--no-saReanneal --saReanneal)'{--no-saReanneal,--saReanneal}'[Disable/enable reannealing when using SA optimizer. Has no effect if optimizer strategy is NOT sa]:sa_reanneal:' \
     '(-c --curve -j --jsonFile -f --cFile)'{-c,--curve=}'[Curve]:curve:->curves' \
     '(-m --method -j --jsonFile -f --cFile)'{-m,--method=}'[Method]:method:->methods' \
     '(-j --jsonFile -c --curve -m --method)'{-j,--jsonFile=}'[JSON-CODE, must --bridge manual]:json:_files -g \*.json' \

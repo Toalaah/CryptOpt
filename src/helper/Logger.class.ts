@@ -20,7 +20,7 @@ export class FileLogger {
     return FileLogger._instance;
   }
 
-  public static init(logFile: string = "/tmp/CryptOpt.log", flushIntervalMs: number = 500) {
+  public static init(logFile: string, flushIntervalMs: number = 500) {
     FileLogger.getInstance(); // Ensure instance exists to properly register cleanup task.
     FileLogger.logFile = logFile;
     if (fs.existsSync(FileLogger.logFile)) fs.truncateSync(FileLogger.logFile, 0);
@@ -46,7 +46,7 @@ export class FileLogger {
 
   public static close(): void {
     if (!FileLogger._instance) return;
-    clearInterval(FileLogger.interval);
+    clearTimeout(FileLogger.interval);
     FileLogger.flush();
     FileLogger._instance = null;
   }

@@ -40,8 +40,6 @@ import type { CryptOpt, CryptoptGlobals, ParsedArgsT } from "@/types";
 import { Logger, FileLogger } from "./helper/Logger.class";
 import globals from "./helper/globals";
 
-FileLogger.init();
-
 let parsedArgs = parsedArgsFromCli;
 if (parsedArgs.startFromBestJson) {
   const symbolname = OptimizerFactory.make(parsedArgs).getSymbolname(true);
@@ -78,7 +76,9 @@ else if (parsedArgsFromCli.readState) {
   }
 }
 
-const { bets, betRatio, curve, method, verbose } = parsedArgs;
+const { bets, betRatio, curve, method, logFile, verbose } = parsedArgs;
+
+if (logFile) FileLogger.init(logFile);
 
 if (parsedArgs.resultDir == "") {
   parsedArgs.resultDir = resolve(process.cwd(), "results");

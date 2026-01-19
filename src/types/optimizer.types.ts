@@ -45,6 +45,7 @@ export type OptimizerArgs = {
   cyclegoal: number;
   readState?: string; // filename
   logComment: string;
+  logFile?: string;
   proof: boolean;
   verbose: boolean;
   bridge: BRIDGES_T;

@@ -10,7 +10,6 @@ import { RegisterAllocator } from "@/registerAllocator";
 import { writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { shuffle } from "lodash-es";
 
 const parsedArgs = parsedArgsFromCli;
 
@@ -63,7 +62,6 @@ for (let y = 0; y < max_y; ++y) {
     if (y === 0 && x === 0) {
       continue;
     }
-
     mutate(CHOICE.DECISION);
     const { code } = assemble(parsedArgs.resultDir);
     const asm = strip(code).join("\n");
@@ -73,12 +71,12 @@ for (let y = 0; y < max_y; ++y) {
     results[y][x] = meanRawMut / meanRawBase;
   }
   Model.restoreSnapshot("tmp");
-  mutate(CHOICE.DECISION);
+  mutate(CHOICE.PERMUTE);
 }
 
 results[0][0] = 1;
 
-const normalized = results.map((y) => y.map((x) => x / results[0][0]));
+// const normalized = results.map((y) => y.map((x) => x));
 
 const script = [
   `import numpy as np`,
@@ -89,7 +87,7 @@ const script = [
   `x = np.linspace(0, ${max_x}, ${max_x})`,
   `y = np.linspace(0, ${max_y}, ${max_y})`,
   `X, Y = np.meshgrid(x, y)`,
-  `Z = np.array(${JSON.stringify(normalized)})`,
+  `Z = np.array(${JSON.stringify(results)})`,
   `fig, ax = plt.subplots(layout='tight')`,
   `norm = mcolors.TwoSlopeNorm(vmin=Z.flatten().min(), vcenter=1.0, vmax=Z.flatten().max())`,
   `cax = ax.imshow(Z, extent=(0, ${max_x}, 0, ${max_y}), origin='lower', cmap='coolwarm', interpolation='bilinear', norm=norm)`,

@@ -225,6 +225,12 @@ export const parsedArgs = y
     default: "",
     describe: "May provide a hint of any kind to be printed on the status line",
   })
+  .option("logFile", {
+    string: true,
+    demandOption: false,
+    default: "/tmp/CryptOpt.log",
+    describe: "Output logs to file",
+  })
   .option("cyclegoal", {
     number: true,
     default: 10000,

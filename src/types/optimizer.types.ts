@@ -35,7 +35,6 @@ export type OptimizerArgs = {
   saInitialTemperature: number;
   saAcceptParam: number;
   saVisitParam: number;
-  saEnergyParam: number;
   saNeighborStrategy: SA_NEIGHBOR_STRATEGY_T;
   saNumNeighbors: number;
   saStepSizeParam: number;

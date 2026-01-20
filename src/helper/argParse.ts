@@ -71,26 +71,20 @@ export const parsedArgs = y
   // START SA-specific args
   .option("saInitialTemperature", {
     number: true,
-    default: 5230,
+    default: 18351,
     min: 1,
     describe: "Initial annealing temperature to use (has no effect if optimizer is not set to 'sa').",
   })
   .option("saVisitParam", {
     number: true,
-    default: 1.6,
+    default: 1.62,
     min: 1 + Number.EPSILON,
     describe:
       "Controls the visit parameter for tuning the cooling schedule. Lower values stetch the cooling tail. Must be strictly greater than one. (has no effect if optimizer is not set to 'sa').",
   })
-  .option("saEnergyParam", {
-    number: true,
-    default: 1.0,
-    min: Number.EPSILON,
-    describe: "Energy scale factor (has no effect if optimizer is not set to 'sa').",
-  })
   .option("saAcceptParam", {
     number: true,
-    default: 6.0,
+    default: 5.515,
     describe: "Acceptance parameter value (has no effect if optimizer is not set to 'sa').",
   })
   .option("saNeighborStrategy", {
@@ -102,13 +96,12 @@ export const parsedArgs = y
   .option("saNumNeighbors", {
     number: true,
     min: 1,
-    default: 1,
-    describe:
-      "Number of neighbors to sample in each epoch. Note that this only has an effect if saNeighborStrategy=weighted.",
+    default: 6,
+    describe: "Number of neighbors to sample in each epoch when using SA.",
   })
   .option("saStepSizeParam", {
     number: true,
-    default: 712,
+    default: 13659.79,
     describe: "Step size parameter value (has no effect if optimizer is not set to 'sa').",
   })
   .option("saMaxMutStepSize", {

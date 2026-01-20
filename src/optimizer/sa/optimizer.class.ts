@@ -24,10 +24,10 @@ import { sum } from "simple-statistics";
 import { Model } from "@/model";
 import { CHOICE } from "@/enums";
 import { cauchy } from "@/paul/distributions";
+import assert from "assert";
 
 export class SAOptimizer extends Optimizer {
   // Number of iterations to perform during optimization.
-  private nIter: number;
   private msOpts: { batchSize: number; numBatches: number };
   private accumulatedTimeSpentByMeasuring: number;
   // Optimizer-specific args
@@ -36,7 +36,6 @@ export class SAOptimizer extends Optimizer {
   private acceptParam: number;
   private visitParam: number;
   private stepSizeParam: number;
-  private energyParam: number;
   private numNeighbors: number;
   private neighborSelectionFunc: NeighborSelectionFunc<number>;
   private candidates: Array<{ asm: string; stacklength: number; choice: CHOICE; ninst: number }>;
@@ -45,7 +44,6 @@ export class SAOptimizer extends Optimizer {
 
   public constructor(args: OptimizerArgs) {
     super(args);
-    this.nIter = this.args.evals;
     // MeasureSuite config
     this.msOpts = { batchSize: 200, numBatches: 31 };
     this.accumulatedTimeSpentByMeasuring = 0;
@@ -53,9 +51,8 @@ export class SAOptimizer extends Optimizer {
     this.acceptParam = this.args.saAcceptParam;
     this.visitParam = this.args.saVisitParam;
     this.stepSizeParam = this.args.saStepSizeParam;
-    this.numNeighbors = this.args.saNumNeighbors;
+    this.numNeighbors = Math.round(this.args.saNumNeighbors);
     this.maxMutationStepSize = Math.round(this.args.saMaxMutStepSize);
-    this.energyParam = this.args.saEnergyParam;
     this.initialTemperature = this.args.saInitialTemperature;
     // Index 0 is current function.
     this.candidates = new Array(1 + this.numNeighbors);
@@ -70,10 +67,13 @@ export class SAOptimizer extends Optimizer {
 
     switch (this.args.saNeighborStrategy) {
       case "uniform":
-        this.neighborSelectionFunc = makeUniformNeighborSelection(this.args.saNumNeighbors);
+        this.neighborSelectionFunc = makeUniformNeighborSelection();
+        break;
+      case "greedy":
+        this.neighborSelectionFunc = makeGreedyNeighborSelection();
         break;
       case "weighted":
-        this.neighborSelectionFunc = makeWeigtedNeighborSelection(this.args.saNumNeighbors);
+        this.neighborSelectionFunc = makeWeigtedNeighborSelection(this.numNeighbors);
         break;
       default:
         throw new Error(`unknown neighbor proposal strategy: ${this.args.saNeighborStrategy}`);
@@ -85,7 +85,11 @@ export class SAOptimizer extends Optimizer {
         this.coolingSchedule = makeExpCoolingSchedule(this.visitParam, this.initialTemperature);
         break;
       case "lin":
-        this.coolingSchedule = makeLinCoolingSchedule(this.nIter, this.visitParam, this.initialTemperature);
+        this.coolingSchedule = makeLinCoolingSchedule(
+          this.args.evals,
+          this.visitParam,
+          this.initialTemperature,
+        );
         break;
       case "log":
         this.coolingSchedule = makeLogCoolingSchedule(this.visitParam, this.initialTemperature);
@@ -96,21 +100,23 @@ export class SAOptimizer extends Optimizer {
     Logger.log(`cooling schedule: ${this.args.saCoolingSchedule}`);
   }
 
-  private shouldAccept(currentEnergy: number, visitEnergy: number, temp: number, epoch: number) {
+  private shouldAccept(currentEnergy: number, visitEnergy: number, temp: number) {
     if (visitEnergy < currentEnergy) {
       return true;
     }
     if (this.acceptParam <= 0) return false;
+
     const r = Math.random();
-    const temp_step = temp / epoch; // Scale temp according to current iteration.
-    const x = 1.0 - (this.acceptParam * (visitEnergy - currentEnergy)) / temp_step;
-    const pr = x <= 0 ? 0 : Math.exp(Math.log(x) / this.acceptParam);
+    const delta = this.acceptParam * (visitEnergy - currentEnergy);
+    if (!(delta >= 0)) errorOut({ exitCode: 123, msg: "negative delta" });
+    const x = (-1 * delta) / temp;
+    const pr = Math.min(1, Math.exp(x));
     Logger.log(`accepting worse candidate with probability ${pr}`);
     return pr >= r;
   }
 
   private energy(x: number): number {
-    return x * this.energyParam;
+    return x;
   }
 
   private updateBatchSize(meanRaw: number) {
@@ -182,6 +188,7 @@ export class SAOptimizer extends Optimizer {
       const optimistaionStartDate = Date.now();
       const CURRENT_FUNCTION = 0 as const;
       let ratioString = "";
+      let numEvals = 0;
       let currentEpoch = 0;
       let time = Date.now();
       let temp = 0;
@@ -205,6 +212,7 @@ export class SAOptimizer extends Optimizer {
           Model.saveSnaphot("0");
           for (let i = 1; i <= this.numNeighbors; ++i) {
             sampleNeighbor(i, temp);
+            numEvals++;
             Model.restoreSnapshot("0");
           }
         }
@@ -241,19 +249,11 @@ export class SAOptimizer extends Optimizer {
         const meanrawCandidate = analyseResult.rawMedian[neighborIdx];
         const meanrawCheck = analyseResult.rawMedian[analyseResult.rawMedian.length - 1];
         this.updateBatchSize(meanrawCheck);
-        // this.numEvals++;
 
         // Decide whether we want to keep mutated candidate.
         let kept: boolean;
-        if (
-          (kept = this.shouldAccept(
-            this.energy(meanrawCurrent),
-            this.energy(meanrawCandidate),
-            temp,
-            currentEpoch,
-          ))
-        ) {
-          FileLogger.log("keeping mutated candidate");
+        if ((kept = this.shouldAccept(this.energy(meanrawCurrent), this.energy(meanrawCandidate), temp))) {
+          FileLogger.log(`keeping mutated candidate ${neighborIdx}`);
           this.candidates[CURRENT_FUNCTION].asm = this.candidates[neighborIdx].asm;
           this.candidates[CURRENT_FUNCTION].stacklength = this.candidates[neighborIdx].stacklength;
           this.candidates[CURRENT_FUNCTION].choice = this.candidates[neighborIdx].choice;
@@ -309,12 +309,12 @@ export class SAOptimizer extends Optimizer {
               indexGood,
               kept,
               no_of_instructions: this.no_of_instructions,
-              numEvals: currentEpoch,
+              numEvals: numEvals,
               ratioString,
               show_per_second: showPerSecond,
               stacklength: this.candidates[CURRENT_FUNCTION].stacklength,
               symbolname: this.symbolname,
-              writeout: currentEpoch % (this.args.evals / LOG_EVERY) === 0,
+              writeout: numEvals % (this.args.evals / LOG_EVERY) === 0,
             });
             process.stdout.write(statusline);
             globals.convergence.push(ratioString);
@@ -324,7 +324,7 @@ export class SAOptimizer extends Optimizer {
         currentEpoch++;
         // Start cleanup
         {
-          if (currentEpoch >= this.nIter) {
+          if (numEvals >= this.args.evals) {
             globals.time.generateCryptopt =
               (Date.now() - optimistaionStartDate) / 1000 - globals.time.validate;
             clearInterval(intervalHandle);
@@ -407,9 +407,9 @@ function makeExpCoolingSchedule(visitParam: number, initialTemp: number): Coolin
   };
 }
 
-function makeLinCoolingSchedule(nIter: number, visitParam: number, initialTemp: number): CoolingSchedule {
+function makeLinCoolingSchedule(nEval: number, visitParam: number, initialTemp: number): CoolingSchedule {
   return (t: number) => {
-    const factor = clamp(t / nIter, 0, 1);
+    const factor = clamp(t / nEval, 0, 1);
     return initialTemp * (1 - factor) * visitParam;
   };
 }
@@ -418,7 +418,7 @@ function makeLogCoolingSchedule(visitParam: number, initialTemp: number): Coolin
   const visit = 2.62;
   const t1 = visit - visitParam;
   return (t: number) => {
-    const a = Math.log(t1 * t);
+    const a = Math.log(t1 * (t + 1));
     const temp = initialTemp / a;
     return temp < 0 ? 0 : temp;
   };
@@ -428,9 +428,12 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 
 type CoolingSchedule = (n: number) => number;
 
-function makeUniformNeighborSelection(n: number): NeighborSelectionFunc<number> {
-  if (n !== 1) throw new Error("number of neighbors must be 1 when using uniform neighbor strategy");
+function makeUniformNeighborSelection(): NeighborSelectionFunc<number> {
   return (candidates: number[]) => Paul.chooseBetween(candidates.length);
+}
+
+function makeGreedyNeighborSelection(): NeighborSelectionFunc<number> {
+  return (candidates: number[]) => candidates.indexOf(Math.min(...candidates));
 }
 
 function makeWeigtedNeighborSelection(n: number): NeighborSelectionFunc<number> {

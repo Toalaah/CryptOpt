@@ -78,7 +78,12 @@ export class SAOptimizer extends Optimizer {
       default:
         throw new Error(`unknown neighbor proposal strategy: ${this.args.saNeighborStrategy}`);
     }
-    Logger.log(`neighbor strategy: ${this.args.saNeighborStrategy}`);
+    if (this.numNeighbors === 1) {
+      this.neighborSelectionFunc = (candidates: number[]) => candidates[0];
+      Logger.log("using no-op neighbor strategy as numNeighbors=1");
+    } else {
+      Logger.log(`neighbor strategy: ${this.args.saNeighborStrategy}`);
+    }
 
     switch (this.args.saCoolingSchedule) {
       case "exp":

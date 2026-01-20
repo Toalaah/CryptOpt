@@ -39,7 +39,7 @@ import {
   SA_COOLING_SCHEDULES,
   SA_COOLING_SCHEDULE_EXP,
   SA_NEIGHBOR_STRATEGIES,
-  SA_NEIGHBOR_STRATEGY_UNIFORM,
+  SA_NEIGHBOR_STRATEGY_GREEDY,
 } from "@/types";
 
 const y = yargs(process.argv.slice(2));
@@ -89,7 +89,7 @@ export const parsedArgs = y
   })
   .option("saNeighborStrategy", {
     string: true,
-    default: SA_NEIGHBOR_STRATEGY_UNIFORM,
+    default: SA_NEIGHBOR_STRATEGY_GREEDY,
     describe: "Neighbor-selection strategy to use for SA (has no effect if optimizer is not set to 'sa').",
     choices: SA_NEIGHBOR_STRATEGIES,
   })

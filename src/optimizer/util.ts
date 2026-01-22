@@ -73,7 +73,7 @@ export function genStatusLine(a: {
     // `${analyseResult.rawResult.stats.virtualAddressB}${re}`,
 
     // lib
-    `${pu}L ${a.analyseResult.batchSizeScaledrawMedian[2].toFixed(0).padStart(3)}${re}`,
+    `${pu}L ${a.analyseResult.batchSizeScaledrawMedian[a.analyseResult.batchSizeScaledrawMedian.length - 1].toFixed(0).padStart(3)}${re}`,
     `${a.ratioString[0] === "0" ? rd : gn}l/g ${bl}${a.ratioString.padStart(6)}${re}`,
 
     `${bl}${a.choice}${re}`,

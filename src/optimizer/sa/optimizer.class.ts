@@ -24,12 +24,12 @@ import { sum } from "simple-statistics";
 import { Model } from "@/model";
 import { CHOICE } from "@/enums";
 import { cauchy } from "@/paul/distributions";
-import assert from "assert";
 
 export class SAOptimizer extends Optimizer {
   // Number of iterations to perform during optimization.
+  private nIter: number;
+  // MeasureSuite options.
   private msOpts: { batchSize: number; numBatches: number };
-  private accumulatedTimeSpentByMeasuring: number;
   // Optimizer-specific args
   private initialTemperature: number;
   private maxMutationStepSize: number; // Maximum number of "steps" a single candidate shall take. Depends also on the current temperature.
@@ -38,33 +38,21 @@ export class SAOptimizer extends Optimizer {
   private stepSizeParam: number;
   private numNeighbors: number;
   private neighborSelectionFunc: NeighborSelectionFunc<number>;
-  private candidates: Array<{ asm: string; stacklength: number; choice: CHOICE; ninst: number }>;
 
   private coolingSchedule: CoolingSchedule;
 
   public constructor(args: OptimizerArgs) {
     super(args);
-    // MeasureSuite config
-    this.msOpts = { batchSize: 200, numBatches: 31 };
-    this.accumulatedTimeSpentByMeasuring = 0;
 
+    this.nIter = this.args.evals;
+    this.msOpts = { batchSize: 200, numBatches: 31 };
+
+    this.initialTemperature = this.args.saInitialTemperature;
+    this.maxMutationStepSize = Math.round(this.args.saMaxMutStepSize);
     this.acceptParam = this.args.saAcceptParam;
     this.visitParam = this.args.saVisitParam;
     this.stepSizeParam = this.args.saStepSizeParam;
     this.numNeighbors = Math.round(this.args.saNumNeighbors);
-    this.maxMutationStepSize = Math.round(this.args.saMaxMutStepSize);
-    this.initialTemperature = this.args.saInitialTemperature;
-    // Index 0 is current function.
-    this.candidates = new Array(1 + this.numNeighbors);
-    for (let i = 0; i < this.candidates.length; ++i) {
-      this.candidates[i] = {
-        asm: "",
-        stacklength: -1,
-        choice: this.choice,
-        ninst: -1,
-      };
-    }
-
     switch (this.args.saNeighborStrategy) {
       case "uniform":
         this.neighborSelectionFunc = makeUniformNeighborSelection();
@@ -84,17 +72,12 @@ export class SAOptimizer extends Optimizer {
     } else {
       Logger.log(`neighbor strategy: ${this.args.saNeighborStrategy}`);
     }
-
     switch (this.args.saCoolingSchedule) {
       case "exp":
         this.coolingSchedule = makeExpCoolingSchedule(this.visitParam, this.initialTemperature);
         break;
       case "lin":
-        this.coolingSchedule = makeLinCoolingSchedule(
-          this.args.evals,
-          this.visitParam,
-          this.initialTemperature,
-        );
+        this.coolingSchedule = makeLinCoolingSchedule(this.nIter, this.visitParam, this.initialTemperature);
         break;
       case "log":
         this.coolingSchedule = makeLogCoolingSchedule(this.visitParam, this.initialTemperature);
@@ -130,41 +113,40 @@ export class SAOptimizer extends Optimizer {
     this.msOpts.batchSize = Math.max(this.msOpts.batchSize, 5);
   }
 
-  /**
-   * Assembles and saves the current model into `slot`.
-   */
-  private assemble(slot: number) {
-    Logger.log("assembling");
-    const assembleResult = assembleASM(this.args.resultDir);
-    const code = assembleResult.code;
-    const filteredInstructions = strip(code);
-    if (slot === 0) this.no_of_instructions = filteredInstructions.length;
-    const asm = (() => {
-      switch (this.args.verbose) {
-        case true:
-          const c = code.join("\n");
-          writeString(pathResolve(this.libcheckfunctionDirectory, `current${slot}.asm`), c);
-          return c;
-        case false:
-          return filteredInstructions.join("\n");
-      }
-    })();
-    this.candidates[slot].asm = asm;
-    this.candidates[slot].stacklength = assembleResult.stacklength;
-    this.candidates[slot].choice = this.choice;
-    this.candidates[slot].ninst = filteredInstructions.length;
-  }
-
   public optimise() {
+    type Candidate = { asm: string; stacklength: number; choice: CHOICE; ninst: number };
+    type State = { asm: string; ratio: number; cycleCount: number };
+    // Initialize candidate slots (index 0 is current function, hence the +1).
+    const candidates = new Array<Candidate>(1 + this.numNeighbors);
+    for (let i = 0; i < candidates.length; ++i) {
+      candidates[i] = {
+        asm: "",
+        stacklength: -1,
+        choice: this.choice,
+        ninst: -1,
+      };
+    }
+    const CURRENT_FUNCTION = 0 as const;
+    let ratioString = "";
+    let accumulatedTimeSpentByMeasuring = 0;
+    let numEvals = 0; // NB: numEvals does not necessarily == iteration loop, as multiple neighbors implies multiple evaluations per loop.
+    let currentEpoch = 0;
+    let xBest: State = { asm: "", ratio: -1, cycleCount: -1 }; // Add slot for storing the best result we see.
+    let temperature = 0;
+    let showPerSecond = "many/s";
+    let perSecondCounter = 0;
+
+    // Various helpers used in main optimization loop below.
+
     /**
-     * Writes candidate `i`'s ASM to file.
+     * Updates best result.
      */
-    const writeASMString = (slot: number) => {
-      writeString(
-        pathResolve(this.libcheckfunctionDirectory, `current${slot}.asm`),
-        // pathResolve(this.libcheckfunctionDirectory, `current${id(slot)}.asm`),
-        this.candidates[slot].asm,
-      );
+    const updateBest = (state: State) => {
+      // Could also filter by raw cycle count here, may have to experiment with what actually delivers better results.
+      if (state.ratio < xBest.ratio) return;
+      xBest.asm = state.asm;
+      xBest.ratio = state.ratio;
+      xBest.cycleCount = state.cycleCount;
     };
 
     /**
@@ -173,6 +155,7 @@ export class SAOptimizer extends Optimizer {
     const sampleNeighbor = (slot: number, temp: number) => {
       const numMuts = (() => {
         const scaledTemp = temp / this.stepSizeParam;
+        // Use Cauchy-Lorentz distribution, allows for occasional long tails to explore the search space more rapidly.
         const n = Math.round(cauchy({ loc: 1, scale: scaledTemp }));
         if (this.maxMutationStepSize <= 0) return Math.max(n, 1);
         return clamp(n, 1, this.maxMutationStepSize);
@@ -180,58 +163,81 @@ export class SAOptimizer extends Optimizer {
       FileLogger.log(`sampled neighbor ${slot} with step size of ${numMuts}`);
       for (let i = 0; i < numMuts; ++i) this.mutate();
       Model.saveSnaphot(slot.toString());
-      this.assemble(slot);
     };
 
-    return new Promise<number>((resolve) => {
+    /**
+     * Assembles and saves the current model into `slot`.
+     */
+    const assemble = (slot: number) => {
+      Logger.log("assembling");
+      const assembleResult = assembleASM(this.args.resultDir);
+      const code = assembleResult.code;
+      const filteredInstructions = strip(code);
+      if (slot === 0) this.no_of_instructions = filteredInstructions.length;
+      const asm = (() => {
+        switch (this.args.verbose) {
+          case true:
+            const c = code.join("\n");
+            writeString(pathResolve(this.libcheckfunctionDirectory, `current${slot}.asm`), c);
+            return c;
+          case false:
+            return filteredInstructions.join("\n");
+        }
+      })();
+      candidates[slot].asm = asm;
+      candidates[slot].stacklength = assembleResult.stacklength;
+      candidates[slot].choice = this.choice;
+      candidates[slot].ninst = filteredInstructions.length;
+    };
+
+    return new Promise<OptimizerResult>((resolve) => {
       FileLogger.log("starting rls optimisation");
+      const optimistaionStartDate = Date.now();
+      let time = Date.now();
       printStartInfo({
         ...this.args,
         symbolname: this.symbolname,
         counter: this.measuresuite.timer,
       });
-      const optimistaionStartDate = Date.now();
-      const CURRENT_FUNCTION = 0 as const;
-      let ratioString = "";
-      let numEvals = 0;
-      let currentEpoch = 0;
-      let time = Date.now();
-      let temp = 0;
-      let showPerSecond = "many/s";
-      let perSecondCounter = 0;
 
       // Before running the optimization loop, assemble the baseline program (at this point, no mutations have taken place).
       {
-        this.assemble(CURRENT_FUNCTION);
+        assemble(CURRENT_FUNCTION);
         // Check for errors, if nothing happens here we are probably fine for the rest of the run.
-        if (this.candidates[CURRENT_FUNCTION].asm.includes("undefined"))
-          throw new Error("ASM string empty/undefined, big yikes");
+        if (candidates[CURRENT_FUNCTION].asm.includes("undefined"))
+          errorOut({ msg: "ASM string empty/undefined, big yikes", exitCode: 1 });
       }
 
       const intervalHandle = setInterval(() => {
-        temp = this.coolingSchedule(currentEpoch);
-        FileLogger.log(`epoch ${currentEpoch}, temp=${temp}`);
+        temperature = this.coolingSchedule(currentEpoch);
+        FileLogger.log(`epoch ${currentEpoch}, temp=${temperature}`);
 
         // Mutation & candidate generation.
         {
-          Model.saveSnaphot("0");
+          Model.saveSnaphot("current");
           for (let i = 1; i <= this.numNeighbors; ++i) {
-            sampleNeighbor(i, temp);
+            sampleNeighbor(i, temperature);
+            assemble(i);
             numEvals++;
-            Model.restoreSnapshot("0");
+            Model.restoreSnapshot("current");
           }
         }
 
-        // Analysis & neighbor selection.
+        // Perform measurements.
         const analyseResult = (() => {
           try {
-            if (this.args.verbose) this.candidates.forEach((_, i) => writeASMString(i));
-            const now = Date.now();
+            if (this.args.verbose)
+              candidates.forEach((_, i) =>
+                writeString(
+                  pathResolve(this.libcheckfunctionDirectory, `current${i}.asm`),
+                  candidates[i].asm,
+                ),
+              );
             FileLogger.log("comparing candidates");
             const results = this.measuresuite.measure(
               this.msOpts.batchSize,
               this.msOpts.numBatches,
-              this.candidates.map((c) => c.asm),
+              candidates.map((c) => c.asm),
             );
 
             this.accumulatedTimeSpentByMeasuring += Date.now() - now;
@@ -245,29 +251,41 @@ export class SAOptimizer extends Optimizer {
           }
         })();
 
+        FileLogger.log(`analyseResult: ${JSON.stringify(analyseResult.rawMedian)}`);
         const meanrawCurrent = analyseResult.rawMedian[CURRENT_FUNCTION];
         const meanrawNeighbors = analyseResult.rawMedian.slice(1, analyseResult.rawMedian.length - 1);
-        FileLogger.log(`analyseResult: ${JSON.stringify(analyseResult.rawMedian)}`);
         // + 1 cause index 0 is always the current ASM string.
         const neighborIdx = this.neighborSelectionFunc(meanrawNeighbors.map((x) => this.energy(x))) + 1;
         FileLogger.log(`chose neighbor: ${neighborIdx}`);
         const meanrawCandidate = analyseResult.rawMedian[neighborIdx];
         const meanrawCheck = analyseResult.rawMedian[analyseResult.rawMedian.length - 1];
+
+        // Update batch size & best result.
         this.updateBatchSize(meanrawCheck);
+        for (let i = 0; i < analyseResult.rawMedian.length - 1; ++i) {
+          const res = analyseResult.rawMedian[i];
+          const ratio = meanrawCheck / res;
+          const cycleCount = analyseResult.batchSizeScaledrawMedian[i];
+          updateBest({ asm: candidates[i].asm, ratio, cycleCount });
+        }
 
         // Decide whether we want to keep mutated candidate.
         let kept: boolean;
-        if ((kept = this.shouldAccept(this.energy(meanrawCurrent), this.energy(meanrawCandidate), temp))) {
+        if (
+          (kept = this.shouldAccept(this.energy(meanrawCurrent), this.energy(meanrawCandidate), temperature))
+        ) {
           FileLogger.log(`keeping mutated candidate ${neighborIdx}`);
-          this.candidates[CURRENT_FUNCTION].asm = this.candidates[neighborIdx].asm;
-          this.candidates[CURRENT_FUNCTION].stacklength = this.candidates[neighborIdx].stacklength;
-          this.candidates[CURRENT_FUNCTION].choice = this.candidates[neighborIdx].choice;
-          this.candidates[CURRENT_FUNCTION].ninst = this.candidates[neighborIdx].ninst;
+          candidates[CURRENT_FUNCTION].asm = candidates[neighborIdx].asm;
+          candidates[CURRENT_FUNCTION].stacklength = candidates[neighborIdx].stacklength;
+          candidates[CURRENT_FUNCTION].choice = candidates[neighborIdx].choice;
+          candidates[CURRENT_FUNCTION].ninst = candidates[neighborIdx].ninst;
+          this.no_of_instructions = candidates[neighborIdx].ninst;
           Model.restoreSnapshot(neighborIdx.toString());
         } else {
           // Nothing needs to be done in this case, since we always pop the "current" state after exploring neighbors.
           FileLogger.log("keeping current");
-          this.choice = this.candidates[neighborIdx].choice;
+          // Use rejected candidate's choice here. TODO: does this even make sense to track in such a way if we perform multiple mutations? Might be more useful to just update a counter...
+          this.choice = candidates[neighborIdx].choice;
           this.updateNumRevert(this.choice);
         }
 
@@ -318,7 +336,7 @@ export class SAOptimizer extends Optimizer {
           if (currentEpoch % PRINT_EVERY == 0) {
             const statusline = genStatusLine({
               ...this.args,
-              logComment: this.args.logComment + ` temp=${temp.toFixed(2)}`,
+              logComment: this.args.logComment + ` temp=${temperature.toFixed(2)}`,
               analyseResult,
               badChunks,
               batchSize: this.msOpts.batchSize,
@@ -328,10 +346,10 @@ export class SAOptimizer extends Optimizer {
               indexGood,
               kept,
               no_of_instructions: this.no_of_instructions,
-              numEvals: numEvals,
+              numEvals,
               ratioString,
               show_per_second: showPerSecond,
-              stacklength: this.candidates[CURRENT_FUNCTION].stacklength,
+              stacklength: candidates[CURRENT_FUNCTION].stacklength,
               symbolname: this.symbolname,
               writeout: currentEpoch % (this.nIter / LOG_EVERY) === 0,
             });
@@ -343,7 +361,7 @@ export class SAOptimizer extends Optimizer {
         currentEpoch++;
         // Start cleanup
         {
-          if (numEvals >= this.args.evals) {
+          if (numEvals >= this.nIter) {
             globals.time.generateCryptopt =
               (Date.now() - optimistaionStartDate) / 1000 - globals.time.validate;
             clearInterval(intervalHandle);
@@ -351,10 +369,15 @@ export class SAOptimizer extends Optimizer {
             let statistics: string[];
             const elapsed = Date.now() - optimistaionStartDate;
             const paddedSeed = padSeed(Paul.initialSeed);
+
+            globals.currentRatio = xBest.ratio;
+            ratioString = globals.currentRatio.toFixed(4);
+            globals.convergence.push(ratioString);
+
             statistics = genStatistics({
               paddedSeed,
               ratioString,
-              evals: this.args.evals,
+              evals: this.nIter,
               elapsed,
               batchSize: this.msOpts.batchSize,
               numBatches: this.msOpts.numBatches,
@@ -378,7 +401,7 @@ export class SAOptimizer extends Optimizer {
               writeString(
                 asmFile,
                 ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
-                  .concat(this.candidates[CURRENT_FUNCTION].asm)
+                  .concat(xBest.asm)
                   .concat(statistics)
                   .join("\n"),
               );

@@ -88,7 +88,7 @@ export function analyseMeasureResult(
     chunks: result.functions
       .filter(({ type }) => type == "ASM")
       .map((f) => (f as AsmFunctionSummary).chunks) as [number, number],
-    correct: result.stats.incorrect !== 0,
+    correct: result.stats.incorrect === 0,
     rawResult: result,
   };
 }

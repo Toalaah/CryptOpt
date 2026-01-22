@@ -96,12 +96,13 @@ export const parsedArgs = y
   .option("saNumNeighbors", {
     number: true,
     min: 1,
-    default: 6,
+    // default: 6,
+    default: 1,
     describe: "Number of neighbors to sample in each epoch when using SA.",
   })
   .option("saStepSizeParam", {
     number: true,
-    default: 13659.79,
+    default: 0.005,
     describe: "Step size parameter value (has no effect if optimizer is not set to 'sa').",
   })
   .option("saMaxMutStepSize", {

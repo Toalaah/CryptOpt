@@ -154,7 +154,7 @@ export class SAOptimizer extends Optimizer {
      */
     const sampleNeighbor = (slot: number, temp: number) => {
       const numMuts = (() => {
-        const scaledTemp = temp / this.stepSizeParam;
+        const scaledTemp = temp * this.stepSizeParam;
         // Use Cauchy-Lorentz distribution, allows for occasional long tails to explore the search space more rapidly.
         const n = Math.round(cauchy({ loc: 1, scale: scaledTemp }));
         if (this.maxMutationStepSize <= 0) return Math.max(n, 1);

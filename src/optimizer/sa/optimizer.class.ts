@@ -289,17 +289,7 @@ export class SAOptimizer extends Optimizer {
             perSecondCounter = 0;
           }
 
-          logMutation({ choice: this.choice, kept, numEvals: currentEpoch });
-
-          const prevBestCycleCount = globals.bestEpoch.result?.rawMedian[0] ?? Infinity;
-          if (
-            /* Either best is empty. */
-            globals.bestEpoch.result === null ||
-            /* Or it is present and this epoch has shown improvement. */
-            minRaw < prevBestCycleCount
-          ) {
-            globals.bestEpoch = { result: analyseResult, indexGood, epoch: currentEpoch };
-          }
+          logMutation({ choice: this.choice, kept, numEvals: numEvals, epoch: currentEpoch });
 
           if (currentEpoch % PRINT_EVERY == 0) {
             const statusline = genStatusLine({
@@ -319,7 +309,7 @@ export class SAOptimizer extends Optimizer {
               show_per_second: showPerSecond,
               stacklength: this.candidates[CURRENT_FUNCTION].stacklength,
               symbolname: this.symbolname,
-              writeout: numEvals % (this.args.evals / LOG_EVERY) === 0,
+              writeout: currentEpoch % (this.nIter / LOG_EVERY) === 0,
             });
             process.stdout.write(statusline);
             globals.convergence.push(ratioString);

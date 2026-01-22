@@ -121,16 +121,18 @@ export function genStatistics(a: {
 export function logMutation({
   choice,
   kept,
+  epoch,
   numEvals,
 }: {
   choice: CHOICE;
+  epoch: number;
   numEvals: number;
   kept: boolean;
 }): void {
   const pDetails = choice == " P" ? Model.permutationStats : "                      ";
   const dDetails = choice == "D " ? Model.decisionStats : "             ";
 
-  globals.mutationLog.push([numEvals, choice.trim(), kept ? 1 : 0, pDetails, dDetails].join(","));
+  globals.mutationLog.push([epoch, numEvals, choice.trim(), kept ? 1 : 0, pDetails, dDetails].join(","));
 }
 
 export function printStartInfo({

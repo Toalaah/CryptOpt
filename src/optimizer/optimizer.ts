@@ -96,7 +96,7 @@ export abstract class Optimizer {
 
     globals.convergence = [];
     globals.mutationLog = [
-      "evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
+      "epoch,evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
     ];
 
     this.no_of_instructions = -1;

@@ -44,7 +44,9 @@ const randomString = sha1Hash(Math.ceil(Date.now() * Math.random())).toString(36
 const libcheckfunctionDirectory = join(tmpdir(), "CryptOpt.cache", randomString);
 const { measuresuite } = init(libcheckfunctionDirectory, parsedArgs);
 globals.convergence = [];
-globals.mutationLog = ["evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall"];
+globals.mutationLog = [
+  "epoch,evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
+];
 
 const msOpts = { batchSize: 200, numBatches: 31 };
 const [max_y, max_x] = [100, 100];

@@ -1,5 +1,5 @@
 import { OptimizerArgs } from "@/types";
-import { Optimizer } from "@/optimizer";
+import { Optimizer, OptimizerResult } from "@/optimizer";
 import { FileLogger, Logger } from "@/helper/Logger.class";
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "@/optimizer/util";
 import { resolve as pathResolve } from "path";
@@ -234,13 +234,13 @@ export class SAOptimizer extends Optimizer {
                 ),
               );
             FileLogger.log("comparing candidates");
+            const now_measure = Date.now();
             const results = this.measuresuite.measure(
               this.msOpts.batchSize,
               this.msOpts.numBatches,
               candidates.map((c) => c.asm),
             );
-
-            this.accumulatedTimeSpentByMeasuring += Date.now() - now;
+            accumulatedTimeSpentByMeasuring += Date.now() - now_measure;
             FileLogger.log("done with measurements for current iteration");
             return analyseMeasureResult(results, {
               batchSize: this.msOpts.batchSize,
@@ -430,7 +430,7 @@ export class SAOptimizer extends Optimizer {
             if (!this.args.verbose) this.cleanLibcheckfunctions();
             const v = this.measuresuite.destroy();
             Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
-            resolve(0);
+            resolve({ ratio: xBest.ratio, cycleCount: xBest.cycleCount });
           }
         } // End cleanup
       }, 0);

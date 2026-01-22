@@ -29,6 +29,8 @@ import { RegisterAllocator } from "@/registerAllocator";
 import { errorOut, ERRORS } from "@/errors";
 import { writeString } from "@/helper";
 
+export type OptimizerResult = { ratio: number; cycleCount: number };
+
 export abstract class Optimizer {
   protected symbolname: string;
   protected no_of_instructions: number;
@@ -119,7 +121,7 @@ export abstract class Optimizer {
     this.choice = CHOICE.PERMUTE;
   }
 
-  public abstract optimise(): Promise<number>;
+  public abstract optimise(): Promise<OptimizerResult>;
   public getMutationStats(): {
     numMut: { permutation: number; decision: number };
     numRevert: { permutation: number; decision: number };

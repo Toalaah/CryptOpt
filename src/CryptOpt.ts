@@ -33,7 +33,7 @@ import {
 } from "@/helper";
 import { registerExitHooks } from "@/helper/process";
 import { Model } from "@/model";
-import { OptimizerFactory, Optimizer } from "@/optimizer";
+import { OptimizerFactory, Optimizer, OptimizerResult } from "@/optimizer";
 import { sha1Hash } from "@/paul";
 import type { CryptOpt, CryptoptGlobals, ParsedArgsT } from "@/types";
 
@@ -104,6 +104,7 @@ registerExitHooks({ ...parsedArgs, symbolname });
 type RunResult = {
   statefile: string;
   ratio: number;
+  cycleCount: number;
   convergence: string[];
   mutationStats: {
     numMut: { permutation: number; decision: number };
@@ -146,6 +147,7 @@ async function allBets(evals: number, bets: number): Promise<RunResult[]> {
 
 async function run(args: ParsedArgsT): Promise<RunResult> {
   let optimizer: Optimizer;
+  let res: OptimizerResult;
   try {
     optimizer = OptimizerFactory.make(args);
   } catch (e) {
@@ -153,7 +155,7 @@ async function run(args: ParsedArgsT): Promise<RunResult> {
     process.exit(1000);
   }
   try {
-    await optimizer.optimise();
+    res = await optimizer.optimise();
   } catch (e) {
     console.error(`CryptOpt-Error while optimising\n`, e);
     process.exit(1000);
@@ -161,8 +163,19 @@ async function run(args: ParsedArgsT): Promise<RunResult> {
 
   const [statefile] = generateResultFilename({ ...args, symbolname: optimizer.getSymbolname(false) });
   Model.persist(statefile, parsedArgs);
-  const { ratio, convergence } = Model.getState();
-  return { statefile, ratio, convergence, mutationStats: optimizer.getMutationStats() };
+  const { ratio, cycleCount } = res;
+  const convergence = globals.convergence;
+  const bestEpochByRatio = structuredClone(globals.bestEpochByRatio);
+  const bestEpochByCycle = structuredClone(globals.bestEpochByCycle);
+  return {
+    statefile,
+    ratio,
+    cycleCount,
+    convergence,
+    bestEpochByRatio,
+    bestEpochByCycle,
+    mutationStats: optimizer.getMutationStats(),
+  };
 }
 
 let runResults: RunResult[];

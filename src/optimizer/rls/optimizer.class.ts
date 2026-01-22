@@ -38,7 +38,7 @@ import { Model } from "@/model";
 import type { AnalyseResult, OptimizerArgs } from "@/types";
 
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "../util";
-import { Optimizer } from "@/optimizer";
+import { Optimizer, OptimizerResult } from "@/optimizer";
 import { Paul } from "@/paul";
 
 export class RLSOptimizer extends Optimizer {
@@ -47,7 +47,7 @@ export class RLSOptimizer extends Optimizer {
   }
 
   public optimise() {
-    return new Promise<number>((resolve) => {
+    return new Promise<OptimizerResult>((resolve) => {
       Logger.log("starting rls optimisation");
       printStartInfo({
         ...this.args,
@@ -329,7 +329,7 @@ export class RLSOptimizer extends Optimizer {
             const v = this.measuresuite.destroy();
             Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
 
-            resolve(0);
+            resolve({ ratio: currentRatio, cycleCount: currentCycleCount });
           }
         }
       }, 0);

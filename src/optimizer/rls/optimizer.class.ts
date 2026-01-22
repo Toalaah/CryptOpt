@@ -67,6 +67,7 @@ export class RLSOptimizer extends Optimizer {
       let show_per_second = "many/s";
       let per_second_counter = 0;
       const intervalHandle = setInterval(() => {
+        const currentEpoch = numEvals;
         if (numEvals > 0) {
           // not first eval, thus we want to mutate.
           this.mutate();
@@ -103,9 +104,6 @@ export class RLSOptimizer extends Optimizer {
           numEvals++;
         } else {
           //else, it was not the first round, we need to measure
-
-          const now_measure = Date.now();
-
           let analyseResult: AnalyseResult | undefined;
           try {
             Logger.log("let the measurements begin!");
@@ -120,13 +118,13 @@ export class RLSOptimizer extends Optimizer {
               );
             }
             // here we need the barriers
+            const now_measure = Date.now();
             const results = this.measuresuite.measure(batchSize, numBatches, [
               this.asmStrings[FUNCTIONS.F_A],
               this.asmStrings[FUNCTIONS.F_B],
             ]);
-            Logger.log("well done guys. The results are in!");
-
             accumulatedTimeSpentByMeasuring += Date.now() - now_measure;
+            Logger.log("well done guys. The results are in!");
 
             analyseResult = analyseMeasureResult(results, { batchSize, resultDir: this.args.resultDir });
 
@@ -195,19 +193,31 @@ export class RLSOptimizer extends Optimizer {
           const indexGood = Number(meanrawA > meanrawB);
           const indexBad = 1 - indexGood;
           const minRaw = Math.min(meanrawB, meanrawA);
-          globals.currentRatio = meanrawCheck / minRaw;
+          const currentRatio = meanrawCheck / minRaw;
+          const currentCycleCount = analyseResult.batchSizeScaledrawMedian[indexGood];
+
+          if (currentRatio > globals.currentRatio) {
+            globals.bestEpochByRatio.epoch = currentEpoch;
+            globals.bestEpochByRatio.nEvals = numEvals;
+            globals.bestEpochByRatio.ratio = currentRatio;
+            globals.bestEpochByRatio.ratio = currentRatio;
+            globals.bestEpochByRatio.cycleCount = currentCycleCount;
+          }
+
+          globals.currentRatio = currentRatio;
 
           const goodChunks = analyseResult.chunks[indexGood];
           const badChunks = analyseResult.chunks[indexBad];
 
-          const prevBestCycleCount = globals.bestEpoch.result?.rawMedian[0] ?? Infinity;
-          if (
-            /* Either best is empty. */
-            globals.bestEpoch.result === null ||
-            /* Or it is present and this epoch has shown improvement. */
-            minRaw < prevBestCycleCount
-          ) {
-            globals.bestEpoch = { result: analyseResult, indexGood, epoch: numEvals };
+          if (currentCycleCount < globals.bestEpochByCycle.cycleCount) {
+            globals.bestEpochByCycle = {
+              result: analyseResult,
+              indexGood,
+              epoch: currentEpoch,
+              ratio: currentRatio,
+              nEvals: numEvals,
+              cycleCount: currentCycleCount,
+            };
           }
 
           ratioString = globals.currentRatio /*aka: new ratio*/

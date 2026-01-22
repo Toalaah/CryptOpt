@@ -279,9 +279,33 @@ export class SAOptimizer extends Optimizer {
           const badChunks = analyseResult.chunks[indexBad];
           const minRaw = Math.min(meanrawCurrent, meanrawCandidate);
 
-          globals.currentRatio = meanrawCheck / minRaw;
-          ratioString = globals.currentRatio.toFixed(4);
+          const currentRatio = meanrawCheck / minRaw;
+          const currentCycleCount = analyseResult.batchSizeScaledrawMedian[indexGood];
+          globals.currentRatio = currentRatio;
 
+          // Update globals w.r.t best ratios/cycle counts.
+          {
+            if (currentRatio >= globals.bestEpochByRatio.ratio) {
+              // Check if we found new PB this epoch.
+              globals.bestEpochByRatio.epoch = currentEpoch;
+              globals.bestEpochByRatio.nEvals = numEvals;
+              globals.bestEpochByRatio.ratio = currentRatio;
+              globals.bestEpochByRatio.cycleCount = currentCycleCount;
+            }
+
+            if (currentCycleCount < globals.bestEpochByCycle.cycleCount) {
+              globals.bestEpochByCycle = {
+                result: analyseResult,
+                indexGood,
+                epoch: currentEpoch,
+                ratio: currentRatio,
+                nEvals: numEvals,
+                cycleCount: currentCycleCount,
+              };
+            }
+          }
+
+          ratioString = globals.currentRatio.toFixed(4);
           perSecondCounter++;
           if (Date.now() - time > 1000) {
             time = Date.now();
@@ -334,7 +358,7 @@ export class SAOptimizer extends Optimizer {
               elapsed,
               batchSize: this.msOpts.batchSize,
               numBatches: this.msOpts.numBatches,
-              acc: this.accumulatedTimeSpentByMeasuring,
+              acc: accumulatedTimeSpentByMeasuring,
               numRevert: this.numRevert,
               numMut: this.numMut,
               counter: this.measuresuite.timer,

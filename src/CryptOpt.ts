@@ -109,6 +109,8 @@ type RunResult = {
     numMut: { permutation: number; decision: number };
     numRevert: { permutation: number; decision: number };
   };
+  bestEpochByRatio: typeof globals.bestEpochByRatio;
+  bestEpochByCycle: typeof globals.bestEpochByCycle;
 };
 
 async function allBets(evals: number, bets: number): Promise<RunResult[]> {

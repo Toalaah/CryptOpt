@@ -18,9 +18,14 @@ import type { CryptoptGlobals } from "@/types";
 
 const globals: CryptoptGlobals = {
   currentRatio: Infinity,
-  bestEpoch: {
+  bestEpochByRatio: { epoch: 0, ratio: 0, nEvals: 0, cycleCount: 0 },
+  bestEpochByCycle: {
+    epoch: 0,
+    ratio: 0,
     result: null,
-    epoch: Infinity,
+    cycleCount: Infinity,
+    indexGood: 0,
+    nEvals: 0,
   },
   convergence: [] as string[], // numbers, but .toFixed(4)
   time: {

@@ -18,10 +18,19 @@ import { AnalyseResult } from "./AnalyseResult.type";
 
 export interface CryptoptGlobals {
   currentRatio: number;
-  bestEpoch: {
+  bestEpochByRatio: {
+    ratio: number;
+    epoch: number;
+    nEvals: number;
+    cycleCount: number;
+  };
+  bestEpochByCycle: {
     result: AnalyseResult | null;
+    ratio: number;
+    cycleCount: number;
     indexGood: number;
     epoch: number;
+    nEvals: number;
   };
   convergence: string[]; // numbers, but .toFixed(4)
   time: {

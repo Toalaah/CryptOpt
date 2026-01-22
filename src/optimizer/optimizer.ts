@@ -98,6 +98,16 @@ export abstract class Optimizer {
     globals.mutationLog = [
       "epoch,evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
     ];
+    globals.bestEpochByRatio = { ratio: 0, epoch: 0, nEvals: 0, cycleCount: 0 };
+    globals.bestEpochByCycle = {
+      result: null,
+      epoch: 0,
+      nEvals: 0,
+      indexGood: 0,
+      cycleCount: Infinity,
+      ratio: 0,
+    };
+    globals.currentRatio = 0;
 
     this.no_of_instructions = -1;
     // load a saved state if necessary

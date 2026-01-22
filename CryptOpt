@@ -31,4 +31,7 @@ cd "${INSTALLDIR}"
 #   "./dist/CryptOpt.js" "${@}"
 #
 #run
-exec node ./dist/CryptOpt.js "${@}"
+CRYPTOPT_CMD="${CRYPTOPT_CMD:-node ./dist/CryptOpt.js}"
+# https://stackoverflow.com/questions/37372225
+IFS=$'\n' CRYPTOPT_CMD=($(xargs -n1 <<<"$CRYPTOPT_CMD"))
+exec "${CRYPTOPT_CMD[@]}" "${@}"

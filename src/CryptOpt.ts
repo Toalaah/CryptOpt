@@ -20,6 +20,7 @@ import { hostname } from "os";
 import { resolve } from "path";
 
 import {
+  bd,
   cy,
   env,
   generateResultFilename,
@@ -204,14 +205,6 @@ if (parsedArgs.single) {
 }
 
 // OPTIMIZATION DONE.
-// Output some stats informally.
-
-process.stdout.write(
-  `\nBest cycle count: ${globals.bestEpoch.result!.batchSizeScaledrawMedian[globals.bestEpoch.indexGood].toFixed(0)} (epoch=${globals.bestEpoch.epoch})\n`,
-);
-process.stdout.write(`Run result: ${JSON.stringify(runResults[runResults.length - 1].mutationStats)}\n`);
-process.stdout.write(`Ratio: ${globals.currentRatio}\n`);
-
 // NOW Analyse and write files for graphing.
 
 const times: CryptoptGlobals["time"] = { validate: 0, generateCryptopt: 0, generateFiat: 0 };
@@ -224,7 +217,8 @@ if ("time" in parsed) {
   times.generateCryptopt += generateCryptopt;
 }
 
-const lastConvergence = runResults[runResults.length - 1].convergence;
+const lastRun = runResults[runResults.length - 1];
+const lastConvergence = lastRun.convergence;
 const longestDataRow = lastConvergence.length;
 
 const spaceSeparated = runResults.reduce((arr, { convergence }) => {
@@ -235,11 +229,10 @@ const spaceSeparated = runResults.reduce((arr, { convergence }) => {
   return arr;
 }, [] as string[]);
 
-const [datFileFull, gpFileFull, pdfFileFull] = generateResultFilename({ ...parsedArgs, symbolname }, [
-  ".dat",
-  ".gp",
-  ".pdf",
-]);
+const [datFileFull, gpFileFull, pdfFileFull, summaryFileFull] = generateResultFilename(
+  { ...parsedArgs, symbolname },
+  [".dat", ".gp", ".pdf", ".summary.json"],
+);
 
 writeString(datFileFull, spaceSeparated.join("\n"));
 process.stdout.write(`Wrote ${cy}${datFileFull}${re} ${spaceSeparated.length}x${longestDataRow}\n`);
@@ -251,8 +244,22 @@ const title = [
   `#Mutations ${SI(parsedArgs.evals)}`,
   new Date().toISOString(),
   hostname(),
+  `Optimizer: ${parsedArgs.optimizer}`,
   Object.entries(times).map((k, v) => `Time for ${k}: ${(v / 60).toFixed(2)}min`),
 ].join(", ");
+
+// Output some stats informally.
+
+const summary = [
+  "",
+  `${cy}${bd}Best epoch (by cycle)${re}: (epoch=${gn}${lastRun.bestEpochByCycle.epoch}${re}) (ratio=${gn}${lastRun.bestEpochByCycle.ratio}${re}) (evals=${gn}${lastRun.bestEpochByCycle.nEvals}${re}) (cycle_count=${gn}${lastRun.bestEpochByCycle.cycleCount}${re})`,
+  `${cy}${bd}Best epoch (by ratio)${re}: (epoch=${gn}${lastRun.bestEpochByRatio.epoch}${re}) (ratio=${gn}${lastRun.bestEpochByRatio.ratio}${re}) (evals=${gn}${lastRun.bestEpochByRatio.nEvals}${re}) (cycle_count=${gn}${lastRun.bestEpochByRatio.cycleCount}${re})`,
+  `${cy}${bd}Mutation statistics${re}: ${JSON.stringify(lastRun.mutationStats)}`,
+  `${cy}${bd}Final ratio${re}: ${gn}${lastRun.ratio}${re}`,
+  `${cy}${bd}Final cycle count (median)${re}: ${gn}${lastRun.cycleCount}${re}`,
+].join("\n");
+process.stdout.write(summary + "\n");
+writeString(summaryFileFull, JSON.stringify(lastRun));
 
 writeString(
   gpFileFull,

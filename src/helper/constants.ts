@@ -86,3 +86,7 @@ export const bl = "\x1b[34m";
 export const pu = "\x1b[35m";
 export const cy = "\x1b[36m";
 export const re = "\x1b[0m";
+
+// Styles
+export const bd = "\x1b[1m";
+export const it = "\x1b[3m";

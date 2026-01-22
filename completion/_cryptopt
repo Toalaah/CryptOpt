@@ -70,7 +70,7 @@ case "$state" in
 	neighborstrategies)
 		_values  'neighborstrategy' \
 			'uniform[Uniform selection of candidates]' \
-			'weighted[Weighted candidate selection]'
+			'weighted[Weighted candidate selection]' \
 			'greedy[Greedy candidate selection]'
 		;;
 	coolingschedules)

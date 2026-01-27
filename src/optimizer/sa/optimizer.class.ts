@@ -52,7 +52,7 @@ export class SAOptimizer extends Optimizer {
     this.acceptParam = this.args.saAcceptParam;
     this.visitParam = this.args.saVisitParam;
     this.stepSizeParam = this.args.saStepSizeParam;
-    this.numNeighbors = Math.round(this.args.saNumNeighbors);
+    this.numNeighbors = Math.max(1, Math.round(this.args.saNumNeighbors));
     switch (this.args.saNeighborStrategy) {
       case "uniform":
         this.neighborSelectionFunc = makeUniformNeighborSelection();
@@ -144,7 +144,7 @@ export class SAOptimizer extends Optimizer {
      */
     const updateBest = (state: State) => {
       // Could also filter by raw cycle count here, may have to experiment with what actually delivers better results.
-      if (state.ratio < xBest.ratio) return;
+      if (state.cycleCount >= xBest.cycleCount && xBest.cycleCount > 0) return;
       xBest.asm = state.asm;
       xBest.ratio = state.ratio;
       xBest.cycleCount = state.cycleCount;
@@ -304,7 +304,7 @@ export class SAOptimizer extends Optimizer {
 
           // Update globals w.r.t best ratios/cycle counts.
           {
-            if (currentRatio >= globals.bestEpochByRatio.ratio) {
+            if (currentRatio > globals.bestEpochByRatio.ratio) {
               // Check if we found new PB this epoch.
               globals.bestEpochByRatio.epoch = currentEpoch;
               globals.bestEpochByRatio.nEvals = numEvals;
@@ -313,14 +313,12 @@ export class SAOptimizer extends Optimizer {
             }
 
             if (currentCycleCount < globals.bestEpochByCycle.cycleCount) {
-              globals.bestEpochByCycle = {
-                result: analyseResult,
-                indexGood,
-                epoch: currentEpoch,
-                ratio: currentRatio,
-                nEvals: numEvals,
-                cycleCount: currentCycleCount,
-              };
+              globals.bestEpochByCycle.result = analyseResult;
+              globals.bestEpochByCycle.indexGood = indexGood;
+              globals.bestEpochByCycle.epoch = currentEpoch;
+              globals.bestEpochByCycle.ratio = currentRatio;
+              globals.bestEpochByCycle.nEvals = numEvals;
+              globals.bestEpochByCycle.cycleCount = currentCycleCount;
             }
           }
 

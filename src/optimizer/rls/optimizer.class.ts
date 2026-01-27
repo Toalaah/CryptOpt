@@ -195,29 +195,28 @@ export class RLSOptimizer extends Optimizer {
           const minRaw = Math.min(meanrawB, meanrawA);
           const currentRatio = meanrawCheck / minRaw;
           const currentCycleCount = analyseResult.batchSizeScaledrawMedian[indexGood];
-
-          if (currentRatio > globals.currentRatio) {
-            globals.bestEpochByRatio.epoch = currentEpoch;
-            globals.bestEpochByRatio.nEvals = numEvals;
-            globals.bestEpochByRatio.ratio = currentRatio;
-            globals.bestEpochByRatio.ratio = currentRatio;
-            globals.bestEpochByRatio.cycleCount = currentCycleCount;
-          }
-
           globals.currentRatio = currentRatio;
-
           const goodChunks = analyseResult.chunks[indexGood];
           const badChunks = analyseResult.chunks[indexBad];
 
-          if (currentCycleCount < globals.bestEpochByCycle.cycleCount) {
-            globals.bestEpochByCycle = {
-              result: analyseResult,
-              indexGood,
-              epoch: currentEpoch,
-              ratio: currentRatio,
-              nEvals: numEvals,
-              cycleCount: currentCycleCount,
-            };
+          // Update globals w.r.t best ratios/cycle counts.
+          {
+            if (currentRatio > globals.bestEpochByRatio.ratio) {
+              // Check if we found new PB this epoch.
+              globals.bestEpochByRatio.epoch = currentEpoch;
+              globals.bestEpochByRatio.nEvals = numEvals;
+              globals.bestEpochByRatio.ratio = currentRatio;
+              globals.bestEpochByRatio.cycleCount = currentCycleCount;
+            }
+
+            if (currentCycleCount < globals.bestEpochByCycle.cycleCount) {
+              globals.bestEpochByCycle.result = analyseResult;
+              globals.bestEpochByCycle.indexGood = indexGood;
+              globals.bestEpochByCycle.epoch = currentEpoch;
+              globals.bestEpochByCycle.ratio = currentRatio;
+              globals.bestEpochByCycle.nEvals = numEvals;
+              globals.bestEpochByCycle.cycleCount = currentCycleCount;
+            }
           }
 
           ratioString = globals.currentRatio /*aka: new ratio*/

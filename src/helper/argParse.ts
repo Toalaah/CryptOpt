@@ -84,7 +84,7 @@ export const parsedArgs = y
   })
   .option("saAcceptParam", {
     number: true,
-    default: 5.515,
+    default: 1 / 5.515,
     describe: "Acceptance parameter value (has no effect if optimizer is not set to 'sa').",
   })
   .option("saNeighborStrategy", {

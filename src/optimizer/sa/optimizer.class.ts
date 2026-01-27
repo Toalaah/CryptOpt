@@ -95,14 +95,15 @@ export class SAOptimizer extends Optimizer {
     if (this.acceptParam <= 0) return false;
 
     const r = Math.random();
-    const delta = this.acceptParam * (visitEnergy - currentEnergy);
+    const delta = (visitEnergy - currentEnergy) / this.acceptParam;
     if (!(delta >= 0)) errorOut({ exitCode: 123, msg: "negative delta" });
     const x = (-1 * delta) / temp;
     const pr = Math.min(1, Math.exp(x));
-    Logger.log(`accepting worse candidate with probability ${pr}`);
+    FileLogger.log(`accepting worse candidate with probability ${pr}`);
     return pr >= r;
   }
 
+  // Likely we will never have to make crazy adjustments here, but we still use this identity function to make potential future refactoring easy.
   private energy(x: number): number {
     return x;
   }

@@ -35,7 +35,7 @@ for curve in ${CURVES[@]}; do
 	for method in ${METHODS[@]}; do
 		for neighbor in ${NEIGHBORS[@]}; do
 			for optimizer in ${OPTIMIZERS[@]}; do
-				run_cryptopt ${optimizer} ${curve} ${method} ${temp}
+				run_cryptopt ${optimizer} ${curve} ${method} ${neighbor}
 			done
 		done
 	done

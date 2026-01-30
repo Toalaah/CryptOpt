@@ -13,7 +13,7 @@ run_cryptopt() {
 	method="${3}"
 	neighbors="${4}"
 
-	id=${optimizer}--${curve}--${method}--neighbors${4}
+	id=${optimizer}--${curve}--${method}--neighbors${neighbors}
 	result_dir="${RESULTS}/${id}"
 	mkdir -p ${result_dir}
 

@@ -28,6 +28,7 @@ export class FileLogger {
   }
 
   public static log(message: string): void {
+    if (!FileLogger._instance) return;
     const ts = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString();
     FileLogger.buffer.push(ts + ": " + message);
   }

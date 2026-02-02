@@ -221,9 +221,8 @@ export const parsedArgs = y
   })
   .option("logFile", {
     string: true,
-    demandOption: false,
-    default: "/tmp/CryptOpt.log",
-    describe: "Output logs to file",
+    default: "",
+    describe: "Output log to file. If empty, no log file is generated",
   })
   .option("cyclegoal", {
     number: true,

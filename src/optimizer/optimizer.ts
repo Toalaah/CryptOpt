@@ -52,15 +52,6 @@ export abstract class Optimizer {
 
   protected choice: CHOICE;
 
-  protected updateNumRevert(revertChoice: CHOICE) {
-    switch (revertChoice) {
-      case CHOICE.PERMUTE:
-        this.numRevert.permutation++;
-      case CHOICE.DECISION:
-        this.numRevert.decision++;
-    }
-  }
-
   protected handleMeasurementError(e: any): never {
     const isIncorrect = e instanceof Error && e.message.includes("tested_incorrect");
     const isInvalid = e instanceof Error && e.message.includes("could not be assembled");
@@ -159,6 +150,33 @@ export abstract class Optimizer {
   }
 
   protected revertFunction = (): void => {};
+
+  protected mutateBatch(n: number): { perm: number; decision: number } {
+    let perm = 0;
+    let decision = 0;
+    for (let i = 0; i < n; ++i) {
+      this.choice = Paul.pick([CHOICE.PERMUTE, CHOICE.DECISION]);
+      switch (this.choice) {
+        case CHOICE.PERMUTE: {
+          Model.mutatePermutation();
+          perm++;
+          break;
+        }
+        case CHOICE.DECISION: {
+          const hasHappend = Model.mutateDecision();
+          if (hasHappend) {
+            decision++;
+          } else {
+            this.choice = CHOICE.PERMUTE;
+            Model.mutatePermutation();
+            perm++;
+          }
+          break;
+        }
+      }
+    }
+    return { perm, decision };
+  }
 
   protected mutate(random: boolean = true): void {
     if (random) {

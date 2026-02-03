@@ -115,7 +115,13 @@ export class SAOptimizer extends Optimizer {
   }
 
   public optimise() {
-    type Candidate = { asm: string; stacklength: number; choice: CHOICE; ninst: number };
+    type Candidate = {
+      asm: string;
+      stacklength: number;
+      choice: CHOICE;
+      ninst: number;
+      mutStats: { numDecision: number; numPerm: number };
+    };
     type State = { asm: string; ratio: number; cycleCount: number };
     // Initialize candidate slots (index 0 is current function, hence the +1).
     const candidates = new Array<Candidate>(1 + this.numNeighbors);
@@ -125,6 +131,10 @@ export class SAOptimizer extends Optimizer {
         stacklength: -1,
         choice: this.choice,
         ninst: -1,
+        mutStats: {
+          numDecision: 0,
+          numPerm: 0,
+        },
       };
     }
     const CURRENT_FUNCTION = 0 as const;
@@ -151,7 +161,7 @@ export class SAOptimizer extends Optimizer {
     };
 
     /**
-     * Samples a neighbor and saves it into `slot`. The model snapshot is saved with an `id` of `slot.toString()`.
+     * Samples a neighbor and saves it into `slot`. The model snapshot is saved with an `id` of `slot.toString()`. Returns the number of permutations/decisions which were made to sample the neighbor.
      */
     const sampleNeighbor = (slot: number, temp: number) => {
       const numMuts = (() => {
@@ -162,8 +172,9 @@ export class SAOptimizer extends Optimizer {
         return clamp(n, 1, this.maxMutationStepSize);
       })();
       FileLogger.log(`sampled neighbor ${slot} with step size of ${numMuts}`);
-      for (let i = 0; i < numMuts; ++i) this.mutate();
+      const mutResult = this.mutateBatch(numMuts);
       Model.saveSnaphot(slot.toString());
+      return mutResult;
     };
 
     /**
@@ -187,7 +198,6 @@ export class SAOptimizer extends Optimizer {
       })();
       candidates[slot].asm = asm;
       candidates[slot].stacklength = assembleResult.stacklength;
-      candidates[slot].choice = this.choice;
       candidates[slot].ninst = filteredInstructions.length;
     };
 
@@ -217,7 +227,12 @@ export class SAOptimizer extends Optimizer {
         {
           Model.saveSnaphot("current");
           for (let i = 1; i <= this.numNeighbors; ++i) {
-            sampleNeighbor(i, temperature);
+            const { perm, decision } = sampleNeighbor(i, temperature);
+            this.numMut.permutation += perm;
+            this.numMut.decision += decision;
+            candidates[i].mutStats.numPerm = perm;
+            candidates[i].mutStats.numDecision = decision;
+            candidates[i].choice = this.choice;
             assemble(i);
             numEvals++;
             Model.restoreSnapshot("current");
@@ -281,13 +296,16 @@ export class SAOptimizer extends Optimizer {
           candidates[CURRENT_FUNCTION].choice = candidates[neighborIdx].choice;
           candidates[CURRENT_FUNCTION].ninst = candidates[neighborIdx].ninst;
           this.no_of_instructions = candidates[neighborIdx].ninst;
+          // this.numMut.permutation += candidates[neighborIdx].mutStats.numPerm;
+          // this.numMut.decision += candidates[neighborIdx].mutStats.numDecision;
           Model.restoreSnapshot(neighborIdx.toString());
         } else {
           // Nothing needs to be done in this case, since we always pop the "current" state after exploring neighbors.
           FileLogger.log("keeping current");
           // Use rejected candidate's choice here. TODO: does this even make sense to track in such a way if we perform multiple mutations? Might be more useful to just update a counter...
           this.choice = candidates[neighborIdx].choice;
-          this.updateNumRevert(this.choice);
+          this.numRevert.permutation += candidates[neighborIdx].mutStats.numPerm;
+          this.numRevert.decision += candidates[neighborIdx].mutStats.numDecision;
         }
 
         // Start statistics & status update.

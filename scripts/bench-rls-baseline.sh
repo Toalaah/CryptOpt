@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-RESULTS="./results-rls-baseline"
+RESULTS="${RESULTS:-./results-rls-baseline}"
 
 CURVES=(curve25519 p521 p448_solinas poly1305 secp256k1_montgomery)
 METHODS=(square mul)
@@ -17,6 +17,10 @@ run_cryptopt() {
 
 	id=${optimizer}--${curve}--${method}--evals${evals}
 	result_dir="${RESULTS}/${id}"
+	if [[ -d "${result_dir}" ]]; then
+		echo "Experiment already exists, skipping..."
+		return
+	fi
 	mkdir -p ${result_dir}
 
 	extra_args=()

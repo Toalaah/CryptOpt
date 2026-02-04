@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 
-RESULTS="./results-neighbors"
+set -euo pipefail
 
-NEIGHBORS=(1 2 4 8 16 32)
+RESULTS="${RESULTS:-./results-neighbors}"
+
+NEIGHBORS=(2 4 8 16 32)
 CURVES=(curve25519 p521 p448_solinas poly1305 secp256k1_montgomery)
 METHODS=(square mul)
+STRATS=(uniform weighted greedy)
 OPTIMIZERS=(sa)
 
 run_cryptopt() {
@@ -12,9 +15,14 @@ run_cryptopt() {
 	curve="${2}"
 	method="${3}"
 	neighbors="${4}"
+	neighbor_strategy="${5}"
 
-	id=${optimizer}--${curve}--${method}--neighbors${neighbors}
+	id=${optimizer}--${curve}--${method}--neighbors${neighbors}--${neighbor_strategy}
 	result_dir="${RESULTS}/${id}"
+	if [[ -d "${result_dir}" ]]; then
+		echo "Experiment already exists, skipping..."
+		return
+	fi
 	mkdir -p ${result_dir}
 
 	extra_args=()
@@ -24,7 +32,7 @@ run_cryptopt() {
 
 	echo "$(date): Running: $id"
 	start=$(date +%s)
-	CryptOpt --optimizer ${optimizer} --curve ${curve} --method ${method} --saNumNeighbors ${neighbors} ${extra_args[@]} --resultDir "${result_dir}" >/dev/null 2>&1
+	CryptOpt --optimizer ${optimizer} --curve ${curve} --method ${method} --saNumNeighbors ${neighbors} --saNeighborStrategy ${neighbor_strategy} ${extra_args[@]} --resultDir "${result_dir}" >/dev/null 2>&1
 	end=$(date +%s)
 	runtime=$((end - start))
 	echo "Took ${runtime}s"
@@ -34,8 +42,10 @@ run_cryptopt() {
 for curve in ${CURVES[@]}; do
 	for method in ${METHODS[@]}; do
 		for neighbor in ${NEIGHBORS[@]}; do
-			for optimizer in ${OPTIMIZERS[@]}; do
-				run_cryptopt ${optimizer} ${curve} ${method} ${neighbor}
+			for strategy in ${STRATS[@]}; do
+				for optimizer in ${OPTIMIZERS[@]}; do
+					run_cryptopt ${optimizer} ${curve} ${method} ${neighbor} ${strategy}
+				done
 			done
 		done
 	done

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-RESULTS="./results-temp"
+set -euo pipefail
+
+RESULTS="${RESULTS:-./results-temp}"
 
 TEMPS=(1000 2000 5000 10000 20000 30000 50000 70000 100000)
 CURVES=(curve25519 p521 p448_solinas poly1305 secp256k1_montgomery)
@@ -15,6 +17,10 @@ run_cryptopt() {
 
 	id=${optimizer}--${curve}--${method}--temp${temp}
 	result_dir="${RESULTS}/${id}"
+	if [[ -d "${result_dir}" ]]; then
+		echo "Experiment already exists, skipping..."
+		return
+	fi
 	mkdir -p ${result_dir}
 
 	extra_args=()

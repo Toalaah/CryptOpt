@@ -32,10 +32,22 @@ def make_args():
         help="group rows to average by the following fields",
     )
     parser.add_argument(
+        "--min",
+        type=lambda s: [str(item) for item in s.replace(" ", ",").split(",")],
+        default=[],
+        help="fields to min for grouped rows",
+    )
+    parser.add_argument(
+        "--max",
+        type=lambda s: [str(item) for item in s.replace(" ", ",").split(",")],
+        default=[],
+        help="fields to max for grouped rows",
+    )
+    parser.add_argument(
         "--average",
         "-a",
-        required=True,
         type=lambda s: [str(item) for item in s.replace(" ", ",").split(",")],
+        default=[],
         help="fields to average for grouped rows",
     )
     parser.add_argument("files", nargs="+", type=valid_csv_file)
@@ -45,7 +57,17 @@ def make_args():
 if __name__ == "__main__":
     args = make_args()
     df = pd.concat(args.files)
-    agg = {col: "first" if col not in args.average else "mean" for col in df.columns}
+    agg = {}
+    for col in df.columns:
+        if col in args.average:
+            agg[col] = "mean"
+        elif col in args.min:
+            agg[col] = "min"
+        elif col in args.max:
+            agg[col] = "min"
+        else:
+            agg[col] = "first"
+
     if args.group_by:
         df = df.groupby(args.group_by, as_index=False).agg(agg)
 

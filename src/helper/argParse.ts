@@ -72,7 +72,7 @@ export const parsedArgs = y
   .option("saInitialTemperature", {
     number: true,
     default: 18351,
-    min: 1,
+    min: 0,
     describe: "Initial annealing temperature to use (has no effect if optimizer is not set to 'sa').",
   })
   .option("saVisitParam", {

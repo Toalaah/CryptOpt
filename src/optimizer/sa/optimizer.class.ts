@@ -48,6 +48,9 @@ export class SAOptimizer extends Optimizer {
     this.msOpts = { batchSize: 200, numBatches: 31 };
 
     this.initialTemperature = this.args.saInitialTemperature;
+    if (this.initialTemperature <= 0) {
+      this.initialTemperature = Number.EPSILON;
+    }
     this.maxMutationStepSize = Math.round(this.args.saMaxMutStepSize);
     this.acceptParam = this.args.saAcceptParam;
     this.visitParam = this.args.saVisitParam;

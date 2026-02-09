@@ -2,6 +2,8 @@ import { Copy } from "./copyplugin";
 import { Strip } from "bun-plugin-strip";
 
 import fs from "fs";
+import path from "path";
+
 const debug = "DEBUG" in process.env;
 if (debug) {
   console.log("\x1b[1m\x1b[36mINFO: building in debug mode\x1b[0m");
@@ -44,11 +46,14 @@ Bun.build({
 });
 
 // Build scripts & measurement tools.
-Bun.build({
-  tsconfig: tsconfigPath,
-  entrypoints: ["./scripts/GraphMutatedVariants.ts"],
-  target: "node",
-  minify: !debug,
-  outdir: "dist",
-  external: ["*.node"],
-});
+for (const script of ["./scripts/GraphMutatedVariants.ts", "./scripts/TestEquivalence.ts"]) {
+  console.log(`Building tool: ${path.basename(script, ".ts")}`);
+  Bun.build({
+    tsconfig: tsconfigPath,
+    entrypoints: [script],
+    target: "node",
+    minify: !debug,
+    outdir: "dist",
+    external: ["*.node"],
+  });
+}

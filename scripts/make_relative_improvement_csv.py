@@ -22,12 +22,16 @@ def get_asm_file_from_state_file(state_file: Path):
         return state_file.with_name(state_file.stem + suffix).with_suffix(".asm")
 
 
-def run_ms(sa: Path, rls: Path):
-    output = subprocess.check_output(
-        ["ms", rls.as_posix(), sa.as_posix(), "-n", "100", "-c"]
-    )
-    data = json.loads(output)
-    cycles_sa, cycles_rls = data["cycles"]
+def run_ms(sa: Path, rls: Path, n: int = 3):
+    cycles_sa = []
+    cycles_rls = []
+    for _ in range(n):
+        output = subprocess.check_output(
+            ["ms", rls.as_posix(), sa.as_posix(), "-n", "100", "-c"]
+        )
+        data = json.loads(output)
+        cycles_sa.extend(data["cycles"][0])
+        cycles_rls.extend(data["cycles"][1])
     return cycles_sa, cycles_rls
 
 

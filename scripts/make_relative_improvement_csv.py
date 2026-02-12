@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
+import sys
 from pathlib import Path
-import csv
 import subprocess
 import json
 import statistics
@@ -55,7 +55,12 @@ def get_run_data(run: Path):
         )
 
 
-results_dir = Path("./results-compare-optimizers-sapporo-trial-3")
+if len(sys.argv) < 2:
+    print(f"Usage: {sys.argv[0]} DIR")
+    exit(0)
+
+res_dir = sys.argv[1]
+results_dir = Path(res_dir)
 runs = map(
     lambda r: get_run_data(
         Path(str(r).removesuffix("".join(r.suffixes))).with_suffix(".json")

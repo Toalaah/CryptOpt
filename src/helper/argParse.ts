@@ -77,7 +77,7 @@ export const parsedArgs = y
   })
   .option("saVisitParam", {
     number: true,
-    default: 1.62,
+    default: 2.46,
     min: 1 + Number.EPSILON,
     describe:
       "Controls the visit parameter for tuning the cooling schedule. Lower values stetch the cooling tail. Must be strictly greater than one. (has no effect if optimizer is not set to 'sa').",
@@ -116,6 +116,14 @@ export const parsedArgs = y
     default: SA_COOLING_SCHEDULE_EXP,
     describe: "Cooling schedule to use (has no effect if optimizer is not set to 'sa').",
     choices: SA_COOLING_SCHEDULES,
+  })
+  .option("saReannealRatio", {
+    number: true,
+    default: 2e-5,
+    describe:
+      "Factor of initial initial temperature under which determines when to reanneal. Set to 0 to disable re-annealing.",
+    min: 0,
+    max: 1,
   })
   // END SA-specific args
   .option("bridge", {

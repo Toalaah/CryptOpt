@@ -40,6 +40,7 @@ export type OptimizerArgs = {
   saStepSizeParam: number;
   saMaxMutStepSize: number;
   saCoolingSchedule: SA_COOLING_SCHEDULE_T;
+  saReannealRatio: number;
   // END SA-specific args
   cyclegoal: number;
   readState?: string; // filename

@@ -32,6 +32,7 @@ export class SAOptimizer extends Optimizer {
   private msOpts: { batchSize: number; numBatches: number };
   // Optimizer-specific args
   private initialTemperature: number;
+  private reAnnealRatio: number;
   private maxMutationStepSize: number; // Maximum number of "steps" a single candidate shall take. Depends also on the current temperature.
   private acceptParam: number;
   private visitParam: number;
@@ -54,6 +55,7 @@ export class SAOptimizer extends Optimizer {
     this.maxMutationStepSize = Math.round(this.args.saMaxMutStepSize);
     this.acceptParam = this.args.saAcceptParam;
     this.visitParam = this.args.saVisitParam;
+    this.reAnnealRatio = this.args.saReannealRatio;
     this.stepSizeParam = this.args.saStepSizeParam;
     this.numNeighbors = Math.max(1, Math.round(this.args.saNumNeighbors));
     switch (this.args.saNeighborStrategy) {
@@ -71,9 +73,9 @@ export class SAOptimizer extends Optimizer {
     }
     if (this.numNeighbors === 1) {
       this.neighborSelectionFunc = (_candidates: number[]) => 0;
-      Logger.log("using no-op neighbor strategy as numNeighbors=1");
+      FileLogger.log("using no-op neighbor strategy as numNeighbors=1");
     } else {
-      Logger.log(`neighbor strategy: ${this.args.saNeighborStrategy}`);
+      FileLogger.log(`neighbor strategy: ${this.args.saNeighborStrategy}`);
     }
     switch (this.args.saCoolingSchedule) {
       case "exp":
@@ -88,7 +90,7 @@ export class SAOptimizer extends Optimizer {
       default:
         throw new Error(`unknown cooling schedule: ${this.args.saCoolingSchedule}`);
     }
-    Logger.log(`cooling schedule: ${this.args.saCoolingSchedule}`);
+    FileLogger.log(`cooling schedule: ${this.args.saCoolingSchedule}`);
   }
 
   private shouldAccept(currentEnergy: number, visitEnergy: number, temp: number) {
@@ -145,12 +147,20 @@ export class SAOptimizer extends Optimizer {
     let accumulatedTimeSpentByMeasuring = 0;
     let numEvals = 0; // NB: numEvals does not necessarily == iteration loop, as multiple neighbors implies multiple evaluations per loop.
     let currentEpoch = 0;
+    const reannealThresh = this.initialTemperature * this.reAnnealRatio;
+    let tempStep = 0; // Separate tracking of temperature step as we may reset it when re-annealing, thus breaking the prior invariant of epoch == tempStep.
     let xBest: State = { asm: "", ratio: -1, cycleCount: -1 }; // Add slot for storing the best result we see.
     let temperature = 0;
     let showPerSecond = "many/s";
     let perSecondCounter = 0;
 
     // Various helpers used in main optimization loop below.
+
+    /**
+     * Determines when the optimization loop should end.
+     */
+    const shouldStop = () =>
+      numEvals >= this.nIter || this.numMut.permutation + this.numMut.decision >= this.nIter;
 
     /**
      * Updates best result.
@@ -205,7 +215,7 @@ export class SAOptimizer extends Optimizer {
     };
 
     return new Promise<OptimizerResult>((resolve) => {
-      FileLogger.log("starting rls optimisation");
+      FileLogger.log("starting sa optimisation");
       const optimistaionStartDate = Date.now();
       let time = Date.now();
       printStartInfo({
@@ -223,7 +233,8 @@ export class SAOptimizer extends Optimizer {
       }
 
       const intervalHandle = setInterval(() => {
-        temperature = this.coolingSchedule(currentEpoch);
+        temperature = this.coolingSchedule(tempStep);
+        if (temperature <= 0) errorOut({ exitCode: 123, msg: "temperature <= 0" });
         FileLogger.log(`epoch ${currentEpoch}, temp=${temperature}`);
 
         // Mutation & candidate generation.
@@ -379,9 +390,17 @@ export class SAOptimizer extends Optimizer {
         } // End statistics
 
         currentEpoch++;
+        tempStep++;
+
+        // Determine whether to re-anneal.
+        if (temperature < reannealThresh) {
+          FileLogger.log(`reannealing`);
+          tempStep = 0;
+        }
+
         // Start cleanup
         {
-          if (numEvals >= this.nIter) {
+          if (shouldStop()) {
             globals.time.generateCryptopt =
               (Date.now() - optimistaionStartDate) / 1000 - globals.time.validate;
             clearInterval(intervalHandle);

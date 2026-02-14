@@ -24,6 +24,7 @@ _arguments -S -s \
     '--saMaxMutStepSize=[Maximum mutation step size to perform when sampling neighbors]:sa_maxstep:' \
     '--saCoolingSchedule=[Cooling schedule to employ when using SA optimizer. Has no effect if optimizer strategy is NOT sa]:coolingschedule:->coolingschedules' \
     '--saAcceptParam=[Acceptance parameter factor for annealing candidate selection. Has no effect if optimizer strategy is NOT sa]:sa_accpr:' \
+    '--saReannealRatio=[Factor of initial initial temperature under which determines when to reanneal. Set to 0 to disable re-annealing. Has no effect if optimizer strategy is NOT sa and re-annealing is disabled]:sa_reannealratio:' \
     '--saStepSizeParam=[Mutation step size parameter factor. Has no effect if optimizer strategy is NOT sa]:sa_sspr:' \
     '--saVisitParam=[Visitng parameter factor for adjusting SA cooling schedule. Has no effect if optimizer strategy is NOT sa]:sa_visitpr:' \
     '(-c --curve -j --jsonFile -f --cFile)'{-c,--curve=}'[Curve]:curve:->curves' \
@@ -39,6 +40,7 @@ _arguments -S -s \
     '(-r --betRatio)'{-r,--betRatio=}'[Ratio of how many evals to spend on bets.]:br:' \
     '--cyclegoal=[Number of cycles to measure, adjusts batch size dynamically]:cg:' \
     '--logComment=[Hint displayed during optimization]:lc:' \
+    '--logFile=[Write to specified log file]:log_file:' \
     '(--no-proof --proof)'{--no-proof,--proof}'[Dis-/En ables proofing. Default on with fiat, default off elsewhere]:proof:' \
     '(-v --verbose)'{-v,--verbose}'[Write a lot of log messages (if compiled with DEBUG=1)]:verbose' \
     '(-z --redzone --no-redzone)'{-z,--redzone,--no-redzone}'[Specify if the redzone should be used at stack spilling]:redzone' \

@@ -20,7 +20,7 @@ export class FileLogger {
     return FileLogger._instance;
   }
 
-  public static init(logFile: string, flushIntervalMs: number = 500) {
+  public static init(logFile: string, flushIntervalMs: number = 100) {
     FileLogger.getInstance(); // Ensure instance exists to properly register cleanup task.
     FileLogger.logFile = logFile;
     if (fs.existsSync(FileLogger.logFile)) fs.truncateSync(FileLogger.logFile, 0);

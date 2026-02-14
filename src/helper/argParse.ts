@@ -105,9 +105,15 @@ export const parsedArgs = y
     default: 0.005,
     describe: "Step size parameter value (has no effect if optimizer is not set to 'sa').",
   })
+  .option("saMinMutStepSize", {
+    number: true,
+    default: 1,
+    describe: "Minimum step size of mutations to perform when sampling a new neighbor.",
+    min: 1,
+  })
   .option("saMaxMutStepSize", {
     number: true,
-    default: -1,
+    default: Infinity,
     describe:
       "Maximum step size of mutations to perform when sampling a new neighbor. Higher values allow the optimizer to navigate the search space more quickly, at the expense of less local search. Values <= 0 imply an unrestricted maximum step size.",
   })
@@ -124,6 +130,13 @@ export const parsedArgs = y
       "Factor of initial initial temperature under which determines when to reanneal. Set to 0 to disable re-annealing.",
     min: 0,
     max: 1,
+  })
+  .option("saReannealFrequency", {
+    number: true,
+    default: -1,
+    describe:
+      "Dynamically adjusts reannealing treshhold such that SA optimizer will perform reannealing n times throughout the optimization loop. Set to 0 to disable. Takes precedence over saReannealRatio",
+    min: -1,
   })
   // END SA-specific args
   .option("bridge", {
@@ -259,12 +272,15 @@ export const parsedArgs = y
       return Math.pow(1000, idx + 1) * Number(evals.substring(0, evals.length - 1));
     },
   })
-  .check(({ evals, bridge, cFile, jsonFile, method, curve }) => {
+  .check(({ evals, bridge, cFile, jsonFile, method, curve, saMinMutStepSize, saMaxMutStepSize }) => {
     if (evals <= 0) {
       throw new Error("--evals must be >0");
     }
     if (bridge == "manual" && (!jsonFile || !cFile)) {
       throw new Error("Bridge is set to manual, but either json or c file is not specified.");
+    }
+    if (saMinMutStepSize > saMaxMutStepSize) {
+      throw new Error("--saMinMutStepSize must be <= --saMaxMutStepSize");
     }
     if (["", "fiat"].includes(bridge)) {
       if (!FIAT_METHODS.includes(method as FIAT_METHOD_T)) {

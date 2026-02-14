@@ -33,6 +33,7 @@ export class SAOptimizer extends Optimizer {
   // Optimizer-specific args
   private initialTemperature: number;
   private reAnnealRatio: number;
+  private minMutationStepSize: number; // Min number of "steps" a single candidate shall take. Depends also on the current temperature.
   private maxMutationStepSize: number; // Maximum number of "steps" a single candidate shall take. Depends also on the current temperature.
   private acceptParam: number;
   private visitParam: number;
@@ -52,10 +53,12 @@ export class SAOptimizer extends Optimizer {
     if (this.initialTemperature <= 0) {
       this.initialTemperature = Number.EPSILON;
     }
+    this.minMutationStepSize = Math.round(this.args.saMinMutStepSize);
     this.maxMutationStepSize = Math.round(this.args.saMaxMutStepSize);
+    if (this.minMutationStepSize > this.maxMutationStepSize)
+      throw new Error(`min mut step size must be <= max mutstepsize`);
     this.acceptParam = this.args.saAcceptParam;
     this.visitParam = this.args.saVisitParam;
-    this.reAnnealRatio = this.args.saReannealRatio;
     this.stepSizeParam = this.args.saStepSizeParam;
     this.numNeighbors = Math.max(1, Math.round(this.args.saNumNeighbors));
     switch (this.args.saNeighborStrategy) {
@@ -91,6 +94,17 @@ export class SAOptimizer extends Optimizer {
         throw new Error(`unknown cooling schedule: ${this.args.saCoolingSchedule}`);
     }
     FileLogger.log(`cooling schedule: ${this.args.saCoolingSchedule}`);
+    this.reAnnealRatio = this.args.saReannealRatio;
+    if (this.args.saReannealFrequency === 0) {
+      this.reAnnealRatio = 0;
+    } else if (this.args.saReannealFrequency > 0) {
+      const numEvalsBetweenReanneal = Math.round(this.nIter / (this.args.saReannealFrequency + 1));
+      const tempAfter = this.coolingSchedule(numEvalsBetweenReanneal);
+      this.reAnnealRatio = tempAfter / this.initialTemperature + Number.EPSILON;
+      FileLogger.log(
+        `dynamically adjusting saReannealRatio so that will re-anneal ${this.args.saReannealFrequency} times (n = ${numEvalsBetweenReanneal}, tempAfterN=${tempAfter}, new_ratio = ${(this.reAnnealRatio = tempAfter / this.initialTemperature)})`,
+      );
+    }
   }
 
   private shouldAccept(currentEnergy: number, visitEnergy: number, temp: number) {
@@ -159,8 +173,9 @@ export class SAOptimizer extends Optimizer {
     /**
      * Determines when the optimization loop should end.
      */
-    const shouldStop = () =>
-      numEvals >= this.nIter || this.numMut.permutation + this.numMut.decision >= this.nIter;
+    const shouldStop = () => numEvals >= this.nIter;
+    // const shouldStop = () =>
+    //   numEvals >= this.nIter || this.numMut.permutation + this.numMut.decision >= this.nIter;
 
     /**
      * Updates best result.
@@ -181,8 +196,7 @@ export class SAOptimizer extends Optimizer {
         const scaledTemp = temp * this.stepSizeParam;
         // Use Cauchy-Lorentz distribution, allows for occasional long tails to explore the search space more rapidly.
         const n = Math.round(cauchy({ loc: 1, scale: scaledTemp }));
-        if (this.maxMutationStepSize <= 0) return Math.max(n, 1);
-        return clamp(n, 1, this.maxMutationStepSize);
+        return clamp(n, this.minMutationStepSize, this.maxMutationStepSize);
       })();
       FileLogger.log(`sampled neighbor ${slot} with step size of ${numMuts}`);
       const mutResult = this.mutateBatch(numMuts);

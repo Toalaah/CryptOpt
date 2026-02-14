@@ -38,9 +38,11 @@ export type OptimizerArgs = {
   saNeighborStrategy: SA_NEIGHBOR_STRATEGY_T;
   saNumNeighbors: number;
   saStepSizeParam: number;
+  saMinMutStepSize: number;
   saMaxMutStepSize: number;
   saCoolingSchedule: SA_COOLING_SCHEDULE_T;
   saReannealRatio: number;
+  saReannealFrequency: number;
   // END SA-specific args
   cyclegoal: number;
   readState?: string; // filename

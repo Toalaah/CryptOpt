@@ -21,10 +21,12 @@ _arguments -S -s \
     '--saInitialTemperature=[Initial temperature value to use for annealing. Has no effect if optimizer strategy is NOT sa]:sa_temp:' \
     '--saNeighborStrategy=[Neighbor-selection strategy to use for SA. Has no effect if optimizer strategy is NOT sa]:neighborstrategy:->neighborstrategies' \
     '--saNumNeighbors=[Number of neighbors to sample per epoch when using SA]:sa_nneigh:' \
+    '--saMinMutStepSize=[Minimum mutation step size to perform when sampling neighbors]:sa_minstep:' \
     '--saMaxMutStepSize=[Maximum mutation step size to perform when sampling neighbors]:sa_maxstep:' \
     '--saCoolingSchedule=[Cooling schedule to employ when using SA optimizer. Has no effect if optimizer strategy is NOT sa]:coolingschedule:->coolingschedules' \
     '--saAcceptParam=[Acceptance parameter factor for annealing candidate selection. Has no effect if optimizer strategy is NOT sa]:sa_accpr:' \
     '--saReannealRatio=[Factor of initial initial temperature under which determines when to reanneal. Set to 0 to disable re-annealing. Has no effect if optimizer strategy is NOT sa and re-annealing is disabled]:sa_reannealratio:' \
+    '--saReannealFrequency=[Dynamically adjusts reannealing treshhold such that SA optimizer will perform reannealing n times throughout the optimization loop. Set to 0 to disable. Takes precedence over saReannealRatio]:sa_reannealfreq:' \
     '--saStepSizeParam=[Mutation step size parameter factor. Has no effect if optimizer strategy is NOT sa]:sa_sspr:' \
     '--saVisitParam=[Visitng parameter factor for adjusting SA cooling schedule. Has no effect if optimizer strategy is NOT sa]:sa_visitpr:' \
     '(-c --curve -j --jsonFile -f --cFile)'{-c,--curve=}'[Curve]:curve:->curves' \

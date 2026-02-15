@@ -39,7 +39,8 @@ it.skip("optimise", () => {
     try {
       expect(() =>
         opt.optimise().then((code) => {
-          expect(code).toEqual(0);
+          expect(code.ratio).toBeGreaterThan(0);
+          expect(code.cycleCount).toBeGreaterThan(0);
           resolve(0);
         }),
       ).not.toThrow();

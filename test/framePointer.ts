@@ -39,7 +39,8 @@ describe("check usage of rbp (framepointer)", () => {
       try {
         expect(() =>
           opt.optimise().then((code) => {
-            expect(code).toEqual(0);
+            expect(code.ratio).toBeGreaterThan(0);
+            expect(code.cycleCount).toBeGreaterThan(0);
             expect(existsSync(args.resultDir)).toBe(true);
             const resultDir = pathResolve(args.resultDir, "fiat", "fiat_p434_mul");
 
@@ -73,7 +74,8 @@ describe("check usage of rbp (framepointer)", () => {
       try {
         expect(() =>
           opt.optimise().then((code) => {
-            expect(code).toEqual(0);
+            expect(code.ratio).toBeGreaterThan(0);
+            expect(code.cycleCount).toBeGreaterThan(0);
             expect(existsSync(args.resultDir)).toBe(true);
             const resultDir = pathResolve(args.resultDir, "fiat", "fiat_p434_mul");
 
@@ -108,7 +110,8 @@ describe("check usage of rbp (framepointer)", () => {
       try {
         expect(() =>
           opt.optimise().then((code) => {
-            expect(code).toEqual(0);
+            expect(code.ratio).toBeGreaterThan(0);
+            expect(code.cycleCount).toBeGreaterThan(0);
             expect(existsSync(args.resultDir)).toBe(true);
             const resultDir = pathResolve(args.resultDir, "fiat", "fiat_p434_mul");
 
@@ -140,7 +143,8 @@ describe("check usage of rbp (framepointer)", () => {
       try {
         expect(() =>
           opt.optimise().then((code) => {
-            expect(code).toEqual(0);
+            expect(code.ratio).toBeGreaterThan(0);
+            expect(code.cycleCount).toBeGreaterThan(0);
             expect(existsSync(args.resultDir)).toBe(true);
             const resultDir = pathResolve(args.resultDir, "fiat", "fiat_p434_mul");
 

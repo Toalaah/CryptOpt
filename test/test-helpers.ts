@@ -21,7 +21,12 @@ import { basename, join } from "path";
 import { METHOD_T } from "@/bridge/bitcoin-core-bridge";
 import { CURVE_T } from "@/bridge/fiat-bridge";
 import { sha1Hash } from "@/paul";
-import type { CryptOpt, OptimizerArgs } from "@/types";
+import {
+  SA_COOLING_SCHEDULE_EXP,
+  SA_NEIGHBOR_STRATEGY_GREEDY,
+  type CryptOpt,
+  type OptimizerArgs,
+} from "@/types";
 
 /**
  * uses a filename curve-method.ts for curve+method.
@@ -53,6 +58,18 @@ export function getTestArgs(filename: string): OptimizerArgs {
     redzone: true,
     framePointer: "omit",
     memoryConstraints: "none",
+    // Not used ATM as all tests currently use RLS. Just set it here to satisfy type-chcker.
+    saInitialTemperature: 10000,
+    saAcceptParam: -1,
+    saVisitParam: -1,
+    saNeighborStrategy: SA_NEIGHBOR_STRATEGY_GREEDY,
+    saNumNeighbors: 1,
+    saStepSizeParam: 1,
+    saMinMutStepSize: 1,
+    saMaxMutStepSize: 1,
+    saCoolingSchedule: SA_COOLING_SCHEDULE_EXP,
+    saReannealRatio: 0,
+    saReannealFrequency: -1,
   };
 }
 

@@ -57,7 +57,8 @@ describe("manualBridge", () => {
 
       try {
         opt.optimise().then((code) => {
-          expect(code).toEqual(0);
+          expect(code.ratio).toBeGreaterThan(0);
+          expect(code.cycleCount).toBeGreaterThan(0);
           expect(mockErr).not.toHaveBeenCalled();
           resolve(0);
         });

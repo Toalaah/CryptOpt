@@ -38,8 +38,9 @@ export type OptimizerArgs = {
   saNeighborStrategy: SA_NEIGHBOR_STRATEGY_T;
   saNumNeighbors: number;
   saStepSizeParam: number;
-  saMinMutStepSize: number;
-  saMaxMutStepSize: number;
+  saMutStepSizeLoc: number;
+  saMutStepSizeMin: number;
+  saMutStepSizeMax: number;
   saCoolingSchedule: SA_COOLING_SCHEDULE_T;
   saReannealRatio: number;
   saReannealFrequency: number;

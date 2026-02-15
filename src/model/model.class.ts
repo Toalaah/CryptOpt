@@ -354,12 +354,12 @@ export class Model {
     const candidate = Model._nodes[candidateIdx];
 
     // get a random decison (as in decison group like "chose an arg", or "choose a flag") from the ones that are hot.
-    const keys = Object.keys(candidate.decisions).filter((k) => candidate.decisionsHot.includes(k));
+    const keys = Object.keys(candidate.decisions).filter((k) =>
+      candidate.decisionsHot.includes(k),
+    ) as DECISION_IDENTIFIER[];
 
     // and save that in key
-    const key = (keys.length == 1
-      ? keys[0]
-      : keys[Paul.chooseBetween(keys.length)]) as unknown as DECISION_IDENTIFIER;
+    const key = keys.length == 1 ? keys[0] : keys[Paul.chooseBetween(keys.length)];
 
     Model.decisionStats = `D[${DI_ABBRV[key]}/${candidateIdx.toString().padStart(3)}/${cands}/${from}]`;
 

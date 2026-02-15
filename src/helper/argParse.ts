@@ -105,13 +105,19 @@ export const parsedArgs = y
     default: 0.005,
     describe: "Step size parameter value (has no effect if optimizer is not set to 'sa').",
   })
-  .option("saMinMutStepSize", {
+  .option("saMutStepSizeLoc", {
+    number: true,
+    default: 1,
+    describe: "Loc (center of Cauchy distribution) to use when sampling mutation step size.",
+    min: 1,
+  })
+  .option("saMutStepSizeMin", {
     number: true,
     default: 1,
     describe: "Minimum step size of mutations to perform when sampling a new neighbor.",
     min: 1,
   })
-  .option("saMaxMutStepSize", {
+  .option("saMutStepSizeMax", {
     number: true,
     default: Infinity,
     describe:

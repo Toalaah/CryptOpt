@@ -33,8 +33,9 @@ export class SAOptimizer extends Optimizer {
   // Optimizer-specific args
   private initialTemperature: number;
   private reAnnealRatio: number;
-  private minMutationStepSize: number; // Min number of "steps" a single candidate shall take. Depends also on the current temperature.
-  private maxMutationStepSize: number; // Maximum number of "steps" a single candidate shall take. Depends also on the current temperature.
+  private mutationStepSizeMin: number; // Min number of "steps" a single candidate shall take. Depends also on the current temperature.
+  private mutationStepSizeMax: number; // Maximum number of "steps" a single candidate shall take. Depends also on the current temperature.
+  private mutationStepSizeLoc: number;
   private acceptParam: number;
   private visitParam: number;
   private stepSizeParam: number;
@@ -53,10 +54,16 @@ export class SAOptimizer extends Optimizer {
     if (this.initialTemperature <= 0) {
       this.initialTemperature = Number.EPSILON;
     }
-    this.minMutationStepSize = Math.round(this.args.saMinMutStepSize);
-    this.maxMutationStepSize = Math.round(this.args.saMaxMutStepSize);
-    if (this.minMutationStepSize > this.maxMutationStepSize)
+    this.mutationStepSizeLoc = Math.round(this.args.saMutStepSizeLoc);
+    this.mutationStepSizeMin = Math.round(this.args.saMutStepSizeMin);
+    this.mutationStepSizeMax = Math.round(this.args.saMutStepSizeMax);
+    if (this.mutationStepSizeMin > this.mutationStepSizeMax)
       throw new Error(`min mut step size must be <= max mutstepsize`);
+    if (
+      this.mutationStepSizeLoc > this.mutationStepSizeMax ||
+      this.mutationStepSizeLoc < this.mutationStepSizeMin
+    )
+      throw new Error(`loc mut step size must be between min and max mutstepsize`);
     this.acceptParam = this.args.saAcceptParam;
     this.visitParam = this.args.saVisitParam;
     this.stepSizeParam = this.args.saStepSizeParam;
@@ -195,8 +202,8 @@ export class SAOptimizer extends Optimizer {
       const numMuts = (() => {
         const scaledTemp = temp * this.stepSizeParam;
         // Use Cauchy-Lorentz distribution, allows for occasional long tails to explore the search space more rapidly.
-        const n = Math.round(cauchy({ loc: 1, scale: scaledTemp }));
-        return clamp(n, this.minMutationStepSize, this.maxMutationStepSize);
+        const n = Math.round(cauchy({ loc: this.mutationStepSizeLoc, scale: scaledTemp }));
+        return clamp(n, this.mutationStepSizeMin, this.mutationStepSizeMax);
       })();
       FileLogger.log(`sampled neighbor ${slot} with step size of ${numMuts}`);
       const mutResult = this.mutateBatch(numMuts);

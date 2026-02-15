@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"maps"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,7 +21,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const numWorkers = 8
+var (
+	benchFile  = flag.String("f", "./scripts/benchmarks.yml", "path to the benchmark YAML file")
+	numWorkers = flag.Int("j", runtime.NumCPU(), "number of parallel jobs (CPUs to use)")
+)
 
 type Values []string
 
@@ -215,14 +220,21 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		log.Fatal("Usage: go run scripts/bench.go <benchmark-name>")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [flags] <benchmark-name>\n\nFlags:\n", os.Args[0])
+		flag.PrintDefaults()
 	}
-	benchName := os.Args[1]
+	flag.Parse()
 
-	data, err := os.ReadFile("scripts/benchmarks.yml")
+	if flag.NArg() < 1 {
+		flag.Usage()
+		os.Exit(1)
+	}
+	benchName := flag.Arg(0)
+
+	data, err := os.ReadFile(*benchFile)
 	if err != nil {
-		log.Fatalf("Failed to read scripts/benchmarks.yml: %v", err)
+		log.Fatalf("Failed to read %s: %v", *benchFile, err)
 	}
 
 	var benchmarks map[string]Benchmark
@@ -255,14 +267,14 @@ func main() {
 
 	fmt.Printf("Benchmark: %s\n", benchName)
 	fmt.Printf("Total runs: %d\n", len(runs))
-	fmt.Printf("Workers: %d (CPUs 0-%d)\n", numWorkers, numWorkers-1)
+	fmt.Printf("Workers: %d (CPUs 0-%d)\n", *numWorkers, *numWorkers-1)
 	fmt.Println()
 
 	jobs := make(chan Run)
 	var wg sync.WaitGroup
 	var completed atomic.Int64
 
-	for i := range numWorkers {
+	for i := range *numWorkers {
 		wg.Add(1)
 		go worker(i, jobs, &wg, len(runs), &completed)
 	}

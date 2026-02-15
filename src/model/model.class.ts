@@ -410,7 +410,10 @@ export class Model {
   private _restoreSnapshot(id: string) {
     const state = this.snapshots[id];
     Logger.log(`Restoring model snapshot: '${id}' (${state})`);
-    if (state === undefined) return;
+    if (state === undefined) {
+      Logger.log(`Could not find model snapshot with id: '${id}'`);
+      return;
+    }
     Model._nodes = state.nodes;
     Model._order = state.order;
     this._currentReadOrderIsValid = false;

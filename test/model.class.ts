@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 
 import { Model } from "@/model";
 import { Paul } from "@/paul";
@@ -155,6 +155,136 @@ describe("Model.class", () => {
     it("shold return the operation, which geneates x1 ", () => {
       const instr = Model.operationByName("x1");
       expect(instr).toEqual(body.find(({ name }) => name[0] == "x1"));
+    });
+  });
+
+  describe("saveSnaphot / restoreSnapshot", () => {
+    beforeEach(() => {
+      // Reset to a known state before each test by reverting any prior mutations
+      Model.revertLastMutation();
+      Paul.seed = 42;
+    });
+
+    function getOrderSnapshot(): string {
+      return Model.order;
+    }
+
+    function getNodeNames(): string {
+      return Model.nodesInTopologicalOrder.map((n) => n.name.join(",")).join("--");
+    }
+
+    it("should restore original order after a mutation", () => {
+      const orderBefore = getOrderSnapshot();
+      const namesBefore = getNodeNames();
+
+      Model.saveSnaphot("before-mutation");
+      // mutatePermutation calls backupbody() internally, then mutates
+      Model.mutatePermutation();
+
+      // The order should have changed (or at minimum we can restore)
+      Model.restoreSnapshot("before-mutation");
+
+      expect(getOrderSnapshot()).toBe(orderBefore);
+      expect(getNodeNames()).toBe(namesBefore);
+    });
+
+    it("should preserve deep copy integrity across multiple mutations", () => {
+      const orderBefore = getOrderSnapshot();
+      const namesBefore = getNodeNames();
+
+      Model.saveSnaphot("pristine");
+
+      // Perform several mutations without reverting — these should not corrupt the snapshot
+      for (let i = 0; i < 5; i++) {
+        Model.mutatePermutation();
+      }
+
+      // The current state should differ from the snapshot (mutations happened)
+      // Restore and verify the snapshot is intact
+      Model.restoreSnapshot("pristine");
+
+      expect(getOrderSnapshot()).toBe(orderBefore);
+      expect(getNodeNames()).toBe(namesBefore);
+    });
+
+    it("should maintain multiple independent snapshots", () => {
+      const stateA_order = getOrderSnapshot();
+      const stateA_names = getNodeNames();
+      Model.saveSnaphot("A");
+
+      // Mutate to get a different state
+      Model.mutatePermutation();
+
+      const stateB_order = getOrderSnapshot();
+      const stateB_names = getNodeNames();
+      Model.saveSnaphot("B");
+
+      // Mutate again so current state differs from both A and B
+      Model.mutatePermutation();
+
+      // Restore A and verify
+      Model.restoreSnapshot("A");
+      expect(getOrderSnapshot()).toBe(stateA_order);
+      expect(getNodeNames()).toBe(stateA_names);
+
+      // Restore B and verify it's independent from A
+      Model.restoreSnapshot("B");
+      expect(getOrderSnapshot()).toBe(stateB_order);
+      expect(getNodeNames()).toBe(stateB_names);
+    });
+
+    it("should be a no-op when restoring a non-existent snapshot", () => {
+      const orderBefore = getOrderSnapshot();
+      const namesBefore = getNodeNames();
+
+      Model.restoreSnapshot("does-not-exist");
+
+      expect(getOrderSnapshot()).toBe(orderBefore);
+      expect(getNodeNames()).toBe(namesBefore);
+    });
+
+    it("should overwrite a snapshot when saving with the same ID", () => {
+      Model.saveSnaphot("slot");
+
+      // Mutate to a new state
+      Model.mutatePermutation();
+      const updatedOrder = getOrderSnapshot();
+      const updatedNames = getNodeNames();
+
+      // Overwrite the same snapshot ID with the new state
+      Model.saveSnaphot("slot");
+
+      // Mutate again
+      Model.mutatePermutation();
+
+      // Restoring "slot" should give us the second save, not the first
+      Model.restoreSnapshot("slot");
+      expect(getOrderSnapshot()).toBe(updatedOrder);
+      expect(getNodeNames()).toBe(updatedNames);
+    });
+
+    it("should keep snapshot and revertLastMutation independent", () => {
+      const initialOrder = getOrderSnapshot();
+      const initialNames = getNodeNames();
+      Model.saveSnaphot("snap");
+
+      // mutatePermutation internally calls backupbody(), then mutates
+      Model.mutatePermutation();
+      const afterFirstMutation_order = getOrderSnapshot();
+      const afterFirstMutation_names = getNodeNames();
+
+      // Second mutation — backupbody() now stores the post-first-mutation state
+      Model.mutatePermutation();
+
+      // revertLastMutation should restore to the state before the *second* mutation
+      Model.revertLastMutation();
+      expect(getOrderSnapshot()).toBe(afterFirstMutation_order);
+      expect(getNodeNames()).toBe(afterFirstMutation_names);
+
+      // restoreSnapshot should still restore the original state, unaffected by revert
+      Model.restoreSnapshot("snap");
+      expect(getOrderSnapshot()).toBe(initialOrder);
+      expect(getNodeNames()).toBe(initialNames);
     });
   });
 });

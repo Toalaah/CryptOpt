@@ -30,6 +30,7 @@ _arguments -S -s \
     '--saReannealFrequency=[Dynamically adjusts reannealing treshhold such that SA optimizer will perform reannealing n times throughout the optimization loop. Set to 0 to disable. Takes precedence over saReannealRatio]:sa_reannealfreq:' \
     '--saStepSizeParam=[Mutation step size parameter factor. Has no effect if optimizer strategy is NOT sa]:sa_sspr:' \
     '--saVisitParam=[Visitng parameter factor for adjusting SA cooling schedule. Has no effect if optimizer strategy is NOT sa]:sa_visitpr:' \
+    '--saMaxRejectStreakGoal=[Min length of reject streak after which to allow reannealing.]:sa_rejstreakgoal:' \
     '(-c --curve -j --jsonFile -f --cFile)'{-c,--curve=}'[Curve]:curve:->curves' \
     '(-m --method -j --jsonFile -f --cFile)'{-m,--method=}'[Method]:method:->methods' \
     '(-j --jsonFile -c --curve -m --method)'{-j,--jsonFile=}'[JSON-CODE, must --bridge manual]:json:_files -g \*.json' \

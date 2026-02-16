@@ -145,6 +145,11 @@ export const parsedArgs = y
       "Dynamically adjusts reannealing treshhold such that SA optimizer will perform reannealing n times throughout the optimization loop. Set to 0 to disable. Takes precedence over saReannealRatio",
     min: -1,
   })
+  .option("saMaxRejectStreakGoal", {
+    number: true,
+    default: 20,
+    describe: "Min length of reject streak after which to allow reannealing.",
+  })
   // END SA-specific args
   .option("bridge", {
     string: true,

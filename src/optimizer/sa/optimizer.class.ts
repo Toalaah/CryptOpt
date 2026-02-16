@@ -113,7 +113,7 @@ export class SAOptimizer extends Optimizer {
         `dynamically adjusting saReannealRatio so that will re-anneal ${this.args.saReannealFrequency} times (n = ${numEvalsBetweenReanneal}, tempAfterN=${tempAfter}, new_ratio = ${(this.reAnnealRatio = tempAfter / this.initialTemperature)})`,
       );
     }
-    this.maxNoImproveStreak = 20;
+    this.maxNoImproveStreak = this.args.saMaxRejectStreakGoal;
   }
 
   private shouldAccept(currentEnergy: number, visitEnergy: number, temp: number) {

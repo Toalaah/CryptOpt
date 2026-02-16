@@ -44,6 +44,7 @@ export type OptimizerArgs = {
   saCoolingSchedule: SA_COOLING_SCHEDULE_T;
   saReannealRatio: number;
   saReannealFrequency: number;
+  saMaxRejectStreakGoal: number;
   // END SA-specific args
   cyclegoal: number;
   readState?: string; // filename

@@ -34,7 +34,7 @@ import {
 } from "@/helper";
 import { registerExitHooks } from "@/helper/process";
 import { Model } from "@/model";
-import { OptimizerFactory, Optimizer, OptimizerResult } from "@/optimizer";
+import { OptimizerFactory, Optimizer, OptimizerResult, MutationStats } from "@/optimizer";
 import { sha1Hash } from "@/paul";
 import type { CryptOpt, CryptoptGlobals, ParsedArgsT } from "@/types";
 
@@ -107,13 +107,10 @@ type RunResult = {
   ratio: number;
   cycleCount: number;
   convergence: string[];
-  mutationStats: {
-    numMut: { permutation: number; decision: number };
-    numRevert: { permutation: number; decision: number };
-  };
+  mutationStats: MutationStats;
   bestEpochByRatio: typeof globals.bestEpochByRatio;
   bestEpochByCycle: typeof globals.bestEpochByCycle;
-};
+} & OptimizerResult;
 
 async function allBets(evals: number, bets: number): Promise<RunResult[]> {
   const runRes = [] as RunResult[];
@@ -164,18 +161,16 @@ async function run(args: ParsedArgsT): Promise<RunResult> {
 
   const [statefile] = generateResultFilename({ ...args, symbolname: optimizer.getSymbolname(false) });
   Model.persist(statefile, parsedArgs);
-  const { ratio, cycleCount } = res;
   const convergence = globals.convergence;
   const bestEpochByRatio = structuredClone(globals.bestEpochByRatio);
   const bestEpochByCycle = structuredClone(globals.bestEpochByCycle);
   return {
     statefile,
-    ratio,
-    cycleCount,
     convergence,
     bestEpochByRatio,
     bestEpochByCycle,
     mutationStats: optimizer.getMutationStats(),
+    ...res,
   };
 }
 
@@ -254,7 +249,7 @@ const summary = [
   "",
   `${cy}${bd}Best epoch (by cycle)${re}: (epoch=${gn}${lastRun.bestEpochByCycle.epoch}${re}) (ratio=${gn}${lastRun.bestEpochByCycle.ratio}${re}) (evals=${gn}${lastRun.bestEpochByCycle.nEvals}${re}) (cycle_count=${gn}${lastRun.bestEpochByCycle.cycleCount}${re})`,
   `${cy}${bd}Best epoch (by ratio)${re}: (epoch=${gn}${lastRun.bestEpochByRatio.epoch}${re}) (ratio=${gn}${lastRun.bestEpochByRatio.ratio}${re}) (evals=${gn}${lastRun.bestEpochByRatio.nEvals}${re}) (cycle_count=${gn}${lastRun.bestEpochByRatio.cycleCount}${re})`,
-  `${cy}${bd}Mutation statistics${re}: ${JSON.stringify(lastRun.mutationStats)}`,
+  `${cy}${bd}Mutation statistics${re}: ${JSON.stringify(lastRun.mutationStats, null, 2)}`,
   `${cy}${bd}Final ratio${re}: ${gn}${lastRun.ratio}${re}`,
   `${cy}${bd}Final cycle count (median)${re}: ${gn}${lastRun.cycleCount}${re}`,
 ].join("\n");

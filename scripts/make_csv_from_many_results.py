@@ -51,6 +51,12 @@ def make_row(run: tuple[Path, Path]) -> dict:
         d["num_revert_d"] = summary["mutationStats"]["numRevert"]["decision"]
         d["num_revert_p"] = summary["mutationStats"]["numRevert"]["permutation"]
 
+        d["maxRejectStreak"] = summary["mutationStats"]["maxRejectStreak"]
+        d["maxAcceptStreak"] = summary["mutationStats"]["maxAcceptStreak"]
+        d["numRejectedEvals"] = summary["mutationStats"]["numRejectedEvals"]
+        d["numAcceptedEvals"] = summary["mutationStats"]["numAcceptedEvals"]
+        d["numUnique"] = summary["mutationStats"]["numUnique"]
+
     with open(state_path, "r") as f:
         state = json.load(f)
         assert state["ratio"] == d["ratio"]
@@ -81,8 +87,12 @@ def make_row(run: tuple[Path, Path]) -> dict:
         d["sa_neighbor_strategy"] = state["parsedArgs"]["saNeighborStrategy"]
         d["sa_num_neighbors"] = state["parsedArgs"]["saNumNeighbors"]
         d["sa_step_size_param"] = state["parsedArgs"]["saStepSizeParam"]
-        d["sa_max_mut_step_size"] = state["parsedArgs"]["saMaxMutStepSize"]
+        d["sa_mut_step_size_max"] = state["parsedArgs"]["saMutStepSizeMax"]
+        d["sa_mut_step_size_min"] = state["parsedArgs"]["saMutStepSizeMin"]
+        d["sa_mut_step_size_loc"] = state["parsedArgs"]["saMutStepSizeLoc"]
         d["sa_cooling_schedule"] = state["parsedArgs"]["saCoolingSchedule"]
+        d["sa_reanneal_ratio"] = state["parsedArgs"]["saReannealRatio"]
+        d["sa_reanneal_frequency"] = state["parsedArgs"]["saReannealFrequency"]
 
     return d
 

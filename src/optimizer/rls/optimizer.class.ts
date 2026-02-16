@@ -66,6 +66,10 @@ export class RLSOptimizer extends Optimizer {
       let time = Date.now();
       let show_per_second = "many/s";
       let per_second_counter = 0;
+
+      let currentAcceptStreak = 0;
+      let currentRejectStreak = 0;
+
       const intervalHandle = setInterval(() => {
         const currentEpoch = numEvals;
         if (numEvals > 0) {
@@ -84,9 +88,12 @@ export class RLSOptimizer extends Optimizer {
         if (this.args.verbose) {
           const c = code.join("\n");
           writeString(pathResolve(this.libcheckfunctionDirectory, "current.asm"), c);
+          this.hashASM(c);
           this.asmStrings[currentNameOfTheFunctionThatHasTheMutation] = c;
         } else {
-          this.asmStrings[currentNameOfTheFunctionThatHasTheMutation] = filteredInstructions.join("\n");
+          const c = filteredInstructions.join("\n");
+          this.hashASM(c);
+          this.asmStrings[currentNameOfTheFunctionThatHasTheMutation] = c;
         }
 
         // check if this was the first round
@@ -182,12 +189,29 @@ export class RLSOptimizer extends Optimizer {
           ) {
             Logger.log("kept    mutation");
             kept = true;
+
+            this.mutationStats.numAcceptedEvals++;
+            currentRejectStreak = 0;
+            currentAcceptStreak++;
+            this.mutationStats.maxAcceptStreak = Math.max(
+              this.mutationStats.maxAcceptStreak,
+              currentAcceptStreak,
+            );
+
             currentNameOfTheFunctionThatHasTheMutation = toggleFUNCTIONS(
               currentNameOfTheFunctionThatHasTheMutation,
             );
           } else {
             // revert
             kept = false;
+
+            this.mutationStats.numRejectedEvals++;
+            currentAcceptStreak = 0;
+            currentRejectStreak++;
+            this.mutationStats.maxRejectStreak = Math.max(
+              this.mutationStats.maxRejectStreak,
+              currentRejectStreak,
+            );
             this.revertFunction();
           }
           const indexGood = Number(meanrawA > meanrawB);
@@ -279,8 +303,8 @@ export class RLSOptimizer extends Optimizer {
               batchSize,
               numBatches,
               acc: accumulatedTimeSpentByMeasuring,
-              numRevert: this.numRevert,
-              numMut: this.numMut,
+              numRevert: this.mutationStats.numRevert,
+              numMut: this.mutationStats.numMut,
               counter: this.measuresuite.timer,
               framePointer: this.args.framePointer,
               memoryConstraints: this.args.memoryConstraints,
@@ -328,7 +352,10 @@ export class RLSOptimizer extends Optimizer {
             const v = this.measuresuite.destroy();
             Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
 
-            resolve({ ratio: currentRatio, cycleCount: currentCycleCount });
+            resolve({
+              ratio: currentRatio,
+              cycleCount: currentCycleCount,
+            });
           }
         }
       }, 0);

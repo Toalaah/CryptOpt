@@ -175,6 +175,8 @@ export class SAOptimizer extends Optimizer {
     let showPerSecond = "many/s";
     let perSecondCounter = 0;
 
+    let currentAcceptStreak = 0;
+    let currentRejectStreak = 0;
     // Various helpers used in main optimization loop below.
 
     /**
@@ -230,6 +232,7 @@ export class SAOptimizer extends Optimizer {
             return filteredInstructions.join("\n");
         }
       })();
+      this.hashASM(asm);
       candidates[slot].asm = asm;
       candidates[slot].stacklength = assembleResult.stacklength;
       candidates[slot].ninst = filteredInstructions.length;
@@ -263,8 +266,8 @@ export class SAOptimizer extends Optimizer {
           Model.saveSnaphot("current");
           for (let i = 1; i <= this.numNeighbors; ++i) {
             const { perm, decision } = sampleNeighbor(i, temperature);
-            this.numMut.permutation += perm;
-            this.numMut.decision += decision;
+            this.mutationStats.numMut.permutation += perm;
+            this.mutationStats.numMut.decision += decision;
             candidates[i].mutStats.numPerm = perm;
             candidates[i].mutStats.numDecision = decision;
             candidates[i].choice = this.choice;
@@ -325,22 +328,35 @@ export class SAOptimizer extends Optimizer {
         if (
           (kept = this.shouldAccept(this.energy(meanrawCurrent), this.energy(meanrawCandidate), temperature))
         ) {
+          this.mutationStats.numAcceptedEvals++;
+          currentRejectStreak = 0;
+          currentAcceptStreak++;
+          this.mutationStats.maxAcceptStreak = Math.max(
+            this.mutationStats.maxAcceptStreak,
+            currentAcceptStreak,
+          );
+
           FileLogger.log(`keeping mutated candidate ${neighborIdx}`);
           candidates[CURRENT_FUNCTION].asm = candidates[neighborIdx].asm;
           candidates[CURRENT_FUNCTION].stacklength = candidates[neighborIdx].stacklength;
           candidates[CURRENT_FUNCTION].choice = candidates[neighborIdx].choice;
           candidates[CURRENT_FUNCTION].ninst = candidates[neighborIdx].ninst;
           this.no_of_instructions = candidates[neighborIdx].ninst;
-          // this.numMut.permutation += candidates[neighborIdx].mutStats.numPerm;
-          // this.numMut.decision += candidates[neighborIdx].mutStats.numDecision;
           Model.restoreSnapshot(neighborIdx.toString());
         } else {
+          this.mutationStats.numRejectedEvals++;
+          currentAcceptStreak = 0;
+          currentRejectStreak++;
+          this.mutationStats.maxRejectStreak = Math.max(
+            this.mutationStats.maxRejectStreak,
+            currentRejectStreak,
+          );
           // Nothing needs to be done in this case, since we always pop the "current" state after exploring neighbors.
           FileLogger.log("keeping current");
           // Use rejected candidate's choice here. TODO: does this even make sense to track in such a way if we perform multiple mutations? Might be more useful to just update a counter...
           this.choice = candidates[neighborIdx].choice;
-          this.numRevert.permutation += candidates[neighborIdx].mutStats.numPerm;
-          this.numRevert.decision += candidates[neighborIdx].mutStats.numDecision;
+          this.mutationStats.numRevert.permutation += candidates[neighborIdx].mutStats.numPerm;
+          this.mutationStats.numRevert.decision += candidates[neighborIdx].mutStats.numDecision;
         }
 
         // Start statistics & status update.
@@ -383,7 +399,14 @@ export class SAOptimizer extends Optimizer {
             perSecondCounter = 0;
           }
 
-          logMutation({ choice: this.choice, kept, numEvals: numEvals, epoch: currentEpoch });
+          logMutation({
+            choice: this.choice,
+            kept,
+            numEvals: numEvals,
+            epoch: currentEpoch,
+            nDesc: candidates[neighborIdx].mutStats.numDecision,
+            nPerm: candidates[neighborIdx].mutStats.numPerm,
+          });
 
           if (currentEpoch % PRINT_EVERY == 0) {
             const statusline = genStatusLine({
@@ -442,8 +465,8 @@ export class SAOptimizer extends Optimizer {
               batchSize: this.msOpts.batchSize,
               numBatches: this.msOpts.numBatches,
               acc: accumulatedTimeSpentByMeasuring,
-              numRevert: this.numRevert,
-              numMut: this.numMut,
+              numRevert: this.mutationStats.numRevert,
+              numMut: this.mutationStats.numMut,
               counter: this.measuresuite.timer,
               framePointer: this.args.framePointer,
               memoryConstraints: this.args.memoryConstraints,
@@ -490,7 +513,10 @@ export class SAOptimizer extends Optimizer {
             if (!this.args.verbose) this.cleanLibcheckfunctions();
             const v = this.measuresuite.destroy();
             Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
-            resolve({ ratio: xBest.ratio, cycleCount: xBest.cycleCount });
+            resolve({
+              ratio: xBest.ratio,
+              cycleCount: xBest.cycleCount,
+            });
           }
         } // End cleanup
       }, 0);

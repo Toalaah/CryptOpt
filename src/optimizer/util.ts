@@ -123,16 +123,34 @@ export function logMutation({
   kept,
   epoch,
   numEvals,
+  nPerm,
+  nDesc,
 }: {
   choice: CHOICE;
   epoch: number;
   numEvals: number;
   kept: boolean;
+  nPerm?: number;
+  nDesc?: number;
 }): void {
   const pDetails = choice == " P" ? Model.permutationStats : "                      ";
   const dDetails = choice == "D " ? Model.decisionStats : "             ";
 
-  globals.mutationLog.push([epoch, numEvals, choice.trim(), kept ? 1 : 0, pDetails, dDetails].join(","));
+  const numPermutationsInThisMutation = nPerm ?? (choice == CHOICE.PERMUTE ? 1 : 0);
+  const numDecisionInThisMutation = nDesc ?? (choice == CHOICE.DECISION ? 1 : 0);
+
+  globals.mutationLog.push(
+    [
+      epoch,
+      numEvals,
+      numPermutationsInThisMutation,
+      numDecisionInThisMutation,
+      choice.trim(),
+      kept ? 1 : 0,
+      pDetails,
+      dDetails,
+    ].join(","),
+  );
 }
 
 export function printStartInfo({

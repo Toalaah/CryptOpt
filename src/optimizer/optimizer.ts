@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { OptimizerArgs } from "@/types";
+import { asm, OptimizerArgs } from "@/types";
 import { Logger } from "@/helper/Logger.class";
 import { Paul, sha1Hash } from "@/paul";
 import { existsSync, rmSync } from "fs";
@@ -28,22 +28,30 @@ import globals from "@/helper/globals";
 import { RegisterAllocator } from "@/registerAllocator";
 import { errorOut, ERRORS } from "@/errors";
 import { writeString } from "@/helper";
+import { createHash } from "crypto";
 
-export type OptimizerResult = { ratio: number; cycleCount: number };
+export type OptimizerResult = {
+  ratio: number;
+  cycleCount: number;
+};
+
+export type MutationStats = {
+  numMut: { permutation: number; decision: number };
+  numRevert: { permutation: number; decision: number };
+
+  maxRejectStreak: number;
+  maxAcceptStreak: number;
+  numRejectedEvals: number;
+  numAcceptedEvals: number;
+  numUnique: number;
+};
 
 export abstract class Optimizer {
   protected symbolname: string;
   protected no_of_instructions: number;
   protected libcheckfunctionDirectory: string;
   protected measuresuite: Measuresuite;
-  protected numMut: { [id: string]: number } = {
-    permutation: 0,
-    decision: 0,
-  };
-  protected numRevert: { [id: string]: number } = {
-    permutation: 0,
-    decision: 0,
-  };
+  protected mutationStats: MutationStats;
 
   protected asmStrings: { [k in FUNCTIONS]: string } = {
     [FUNCTIONS.F_A]: "",
@@ -51,6 +59,12 @@ export abstract class Optimizer {
   };
 
   protected choice: CHOICE;
+
+  protected asmHashes: Set<string>;
+  protected hashASM(asm: asm) {
+    this.asmHashes.add(createHash("md5").update(asm).digest("hex"));
+    this.mutationStats.numUnique = this.asmHashes.size;
+  }
 
   protected handleMeasurementError(e: any): never {
     const isIncorrect = e instanceof Error && e.message.includes("tested_incorrect");
@@ -86,10 +100,22 @@ export abstract class Optimizer {
     const { measuresuite, symbolname } = init(this.libcheckfunctionDirectory, args);
     this.measuresuite = measuresuite;
     this.symbolname = symbolname;
+    this.asmHashes = new Set<string>();
+
+    this.mutationStats = {
+      numMut: { permutation: 0, decision: 0 },
+      numRevert: { permutation: 0, decision: 0 },
+
+      maxRejectStreak: 0,
+      maxAcceptStreak: 0,
+      numRejectedEvals: 0,
+      numAcceptedEvals: 0,
+      numUnique: 0,
+    };
 
     globals.convergence = [];
     globals.mutationLog = [
-      "epoch,evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
+      "epoch,evaluation,nPerm,nDesc,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
     ];
     globals.bestEpochByRatio = { ratio: 0, epoch: 0, nEvals: 0, cycleCount: 0 };
     globals.bestEpochByCycle = {
@@ -113,20 +139,8 @@ export abstract class Optimizer {
   }
 
   public abstract optimise(): Promise<OptimizerResult>;
-  public getMutationStats(): {
-    numMut: { permutation: number; decision: number };
-    numRevert: { permutation: number; decision: number };
-  } {
-    return {
-      numMut: {
-        decision: this.numMut.decision,
-        permutation: this.numMut.permutation,
-      },
-      numRevert: {
-        decision: this.numRevert.decision,
-        permutation: this.numRevert.permutation,
-      },
-    };
+  public getMutationStats(): MutationStats {
+    return this.mutationStats;
   }
 
   public getSymbolname(deleteCache: boolean = false) {
@@ -187,10 +201,10 @@ export abstract class Optimizer {
       case CHOICE.PERMUTE: {
         Model.mutatePermutation();
         this.revertFunction = () => {
-          this.numRevert.permutation++;
+          this.mutationStats.numRevert.permutation++;
           Model.revertLastMutation();
         };
-        this.numMut.permutation++;
+        this.mutationStats.numMut.permutation++;
         break;
       }
       case CHOICE.DECISION: {
@@ -202,11 +216,11 @@ export abstract class Optimizer {
           return;
         }
         this.revertFunction = () => {
-          this.numRevert.decision++;
+          this.mutationStats.numRevert.decision++;
           Model.revertLastMutation();
         };
 
-        this.numMut.decision++;
+        this.mutationStats.numMut.decision++;
       }
     }
   }

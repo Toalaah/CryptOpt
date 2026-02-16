@@ -33,6 +33,7 @@ export class SAOptimizer extends Optimizer {
   // Optimizer-specific args
   private initialTemperature: number;
   private reAnnealRatio: number;
+  private maxNoImproveStreak: number;
   private mutationStepSizeMin: number; // Min number of "steps" a single candidate shall take. Depends also on the current temperature.
   private mutationStepSizeMax: number; // Maximum number of "steps" a single candidate shall take. Depends also on the current temperature.
   private mutationStepSizeLoc: number;
@@ -112,6 +113,7 @@ export class SAOptimizer extends Optimizer {
         `dynamically adjusting saReannealRatio so that will re-anneal ${this.args.saReannealFrequency} times (n = ${numEvalsBetweenReanneal}, tempAfterN=${tempAfter}, new_ratio = ${(this.reAnnealRatio = tempAfter / this.initialTemperature)})`,
       );
     }
+    this.maxNoImproveStreak = 20;
   }
 
   private shouldAccept(currentEnergy: number, visitEnergy: number, temp: number) {
@@ -186,6 +188,10 @@ export class SAOptimizer extends Optimizer {
     // const shouldStop = () =>
     //   numEvals >= this.nIter || this.numMut.permutation + this.numMut.decision >= this.nIter;
 
+    const shouldReanneal = () => currentRejectStreak >= this.maxNoImproveStreak;
+    // const shouldReanneal = () =>
+    //   temperature < reannealThresh || currentRejectStreak >= this.maxNoImproveStreak;
+
     /**
      * Updates best result.
      */
@@ -204,10 +210,13 @@ export class SAOptimizer extends Optimizer {
       const numMuts = (() => {
         const scaledTemp = temp * this.stepSizeParam;
         // Use Cauchy-Lorentz distribution, allows for occasional long tails to explore the search space more rapidly.
-        const n = Math.round(cauchy({ loc: this.mutationStepSizeLoc, scale: scaledTemp }));
-        return clamp(n, this.mutationStepSizeMin, this.mutationStepSizeMax);
+        const n = Math.abs(Math.round(cauchy({ loc: this.mutationStepSizeLoc, scale: scaledTemp })));
+        const clamped = clamp(n, this.mutationStepSizeMin, this.mutationStepSizeMax);
+        FileLogger.log(
+          `sampled neighbor ${slot} with step size of ${n} (clamped=${clamped}) (scale=${scaledTemp}, loc=${this.mutationStepSizeLoc})`,
+        );
+        return clamped;
       })();
-      FileLogger.log(`sampled neighbor ${slot} with step size of ${numMuts}`);
       const mutResult = this.mutateBatch(numMuts);
       Model.saveSnaphot(slot.toString());
       return mutResult;
@@ -260,6 +269,13 @@ export class SAOptimizer extends Optimizer {
         temperature = this.coolingSchedule(tempStep);
         if (temperature <= 0) errorOut({ exitCode: 123, msg: "temperature <= 0" });
         FileLogger.log(`epoch ${currentEpoch}, temp=${temperature}`);
+
+        // Determine whether to re-anneal.
+        if (shouldReanneal()) {
+          FileLogger.log(`reannealing`);
+          tempStep = 0;
+          temperature = this.coolingSchedule(tempStep);
+        }
 
         // Mutation & candidate generation.
         {
@@ -436,12 +452,6 @@ export class SAOptimizer extends Optimizer {
         currentEpoch++;
         tempStep++;
 
-        // Determine whether to re-anneal.
-        if (temperature < reannealThresh) {
-          FileLogger.log(`reannealing`);
-          tempStep = 0;
-        }
-
         // Start cleanup
         {
           if (shouldStop()) {
@@ -526,11 +536,10 @@ export class SAOptimizer extends Optimizer {
 
 function makeExpCoolingSchedule(visitParam: number, initialTemp: number): CoolingSchedule {
   const a = visitParam - 1;
-  const t1 = Math.expm1(a * Math.log(2.0));
-
+  const t1 = Math.expm1(a * Math.log(2.0)); // 2^a - 1
   return (t: number) => {
     const s = t + 2.0;
-    const t2 = Math.expm1(a * Math.log(s));
+    const t2 = Math.expm1(a * Math.log(s)); // (t+2)^a - 1
     return (initialTemp * t1) / t2;
   };
 }
@@ -543,10 +552,8 @@ function makeLinCoolingSchedule(nEval: number, visitParam: number, initialTemp: 
 }
 
 function makeLogCoolingSchedule(visitParam: number, initialTemp: number): CoolingSchedule {
-  const visit = 2.62;
-  const t1 = visit - visitParam;
   return (t: number) => {
-    const a = Math.log(t1 * (t + 1));
+    const a = Math.log(visitParam * (t + 1));
     const temp = initialTemp / a;
     return temp < 0 ? 0 : temp;
   };

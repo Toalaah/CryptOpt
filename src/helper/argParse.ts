@@ -71,7 +71,7 @@ export const parsedArgs = y
   // START SA-specific args
   .option("saInitialTemperature", {
     number: true,
-    default: 18351,
+    default: 10000,
     min: 0,
     describe: "Initial annealing temperature to use (has no effect if optimizer is not set to 'sa').",
   })
@@ -102,7 +102,7 @@ export const parsedArgs = y
   })
   .option("saStepSizeParam", {
     number: true,
-    default: 0.005,
+    default: 0.0002,
     describe: "Step size parameter value (has no effect if optimizer is not set to 'sa').",
   })
   .option("saMutStepSizeLoc", {
@@ -121,7 +121,8 @@ export const parsedArgs = y
     number: true,
     default: Infinity,
     describe:
-      "Maximum step size of mutations to perform when sampling a new neighbor. Higher values allow the optimizer to navigate the search space more quickly, at the expense of less local search. Values <= 0 imply an unrestricted maximum step size.",
+      "Maximum step size of mutations to perform when sampling a new neighbor. Higher values allow the optimizer to navigate the search space more quickly, at the expense of less local search. Leave unset for unrestricted maximum step size.",
+    min: 0,
   })
   .option("saCoolingSchedule", {
     string: true,

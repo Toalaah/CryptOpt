@@ -2,7 +2,9 @@
 
 from pathlib import Path
 import json
+import numpy as np
 import os
+import pandas as pd
 import csv
 import argparse
 
@@ -28,9 +30,9 @@ def make_args():
     return parser.parse_args()
 
 
-def make_row(run: tuple[Path, Path]) -> dict:
+def make_row(run: tuple[Path, Path, Path]) -> dict:
     d = {}
-    summary_path, state_path = run
+    summary_path, state_path, mutation_log = run
     with open(summary_path, "r") as f:
         summary = json.load(f)
         d["ratio"] = summary["ratio"]
@@ -51,11 +53,13 @@ def make_row(run: tuple[Path, Path]) -> dict:
         d["num_revert_d"] = summary["mutationStats"]["numRevert"]["decision"]
         d["num_revert_p"] = summary["mutationStats"]["numRevert"]["permutation"]
 
-        d["maxRejectStreak"] = summary["mutationStats"]["maxRejectStreak"]
-        d["maxAcceptStreak"] = summary["mutationStats"]["maxAcceptStreak"]
-        d["numRejectedEvals"] = summary["mutationStats"]["numRejectedEvals"]
-        d["numAcceptedEvals"] = summary["mutationStats"]["numAcceptedEvals"]
-        d["numUnique"] = summary["mutationStats"]["numUnique"]
+        d["max_reject_streak"] = summary["mutationStats"]["maxRejectStreak"]
+        d["max_accept_streak"] = summary["mutationStats"]["maxAcceptStreak"]
+        d["num_rejected_evals"] = summary["mutationStats"]["numRejectedEvals"]
+        d["num_accepted_evals"] = summary["mutationStats"]["numAcceptedEvals"]
+        d["max_step_size"] = summary["mutationStats"]["maxMutStepSize"]
+        d["avg_step_size"] = summary["mutationStats"]["avgMutStepSize"]
+        d["num_unique"] = summary["mutationStats"]["numUnique"]
 
     with open(state_path, "r") as f:
         state = json.load(f)
@@ -78,7 +82,7 @@ def make_row(run: tuple[Path, Path]) -> dict:
         d["symbol"] = state["parsedArgs"]["symbolname"]
 
         d["bets"] = state["parsedArgs"]["bets"]
-        d["betRatio"] = state["parsedArgs"]["betRatio"]
+        d["bet_ratio"] = state["parsedArgs"]["betRatio"]
 
         # These are only relevant if optimizer == 'sa'
         d["sa_initial_temperature"] = state["parsedArgs"]["saInitialTemperature"]
@@ -94,17 +98,48 @@ def make_row(run: tuple[Path, Path]) -> dict:
         d["sa_reanneal_ratio"] = state["parsedArgs"]["saReannealRatio"]
         d["sa_reanneal_frequency"] = state["parsedArgs"]["saReannealFrequency"]
 
+    with open(mutation_log, "r") as f:
+        df = pd.read_csv(f)
+        mut_log = df["kept"].to_numpy()
+        reject_streaks = []
+        accept_streaks = []
+        current_reject_streak = 0
+        current_accept_streak = 0
+        for kept in mut_log:
+            match kept:
+                case 0:
+                    if current_accept_streak > 0:
+                        accept_streaks.append(current_accept_streak)
+                        current_accept_streak = 0
+                    current_reject_streak += 1
+                case 1:
+                    if current_reject_streak > 0:
+                        reject_streaks.append(current_reject_streak)
+                        current_reject_streak = 0
+                    current_accept_streak += 1
+                case n:
+                    raise ValueError(f"unexpected value in mutation log: {n}")
+        d["num_reject_streak"] = len(reject_streaks)
+        d["num_accept_streak"] = len(accept_streaks)
+        d["avg_reject_streak"] = np.average(reject_streaks)
+        d["avg_accept_streak"] = np.average(accept_streaks)
+        pass
+
     return d
 
 
 if __name__ == "__main__":
     args = make_args()
     results_dir = Path(args.dir)
+    with_suffix = lambda path, suffix: Path(
+        str(path).removesuffix("".join(path.suffixes))
+    ).with_suffix(suffix)
     runs = list(
         map(
             lambda r: (
                 r,
-                Path(str(r).removesuffix("".join(r.suffixes))).with_suffix(".json"),
+                with_suffix(r, ".json"),  # State file
+                with_suffix(r, ".csv"),  # Mutation log
             ),
             results_dir.rglob("**/*.summary.json"),
         )

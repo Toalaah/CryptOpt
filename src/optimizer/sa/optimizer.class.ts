@@ -189,6 +189,7 @@ export class SAOptimizer extends Optimizer {
     //   numEvals >= this.nIter || this.numMut.permutation + this.numMut.decision >= this.nIter;
 
     const shouldReanneal = () => currentRejectStreak >= this.maxNoImproveStreak;
+    // const shouldReanneal = () => currentRejectStreak >= this.maxNoImproveStreak && tempStep >= 1000;
     // const shouldReanneal = () =>
     //   temperature < reannealThresh || currentRejectStreak >= this.maxNoImproveStreak;
 
@@ -212,6 +213,7 @@ export class SAOptimizer extends Optimizer {
         // Use Cauchy-Lorentz distribution, allows for occasional long tails to explore the search space more rapidly.
         const n = Math.abs(Math.round(cauchy({ loc: this.mutationStepSizeLoc, scale: scaledTemp })));
         const clamped = clamp(n, this.mutationStepSizeMin, this.mutationStepSizeMax);
+        if (clamped > this.mutationStats.maxMutStepSize) this.mutationStats.maxMutStepSize = clamped;
         FileLogger.log(
           `sampled neighbor ${slot} with step size of ${n} (clamped=${clamped}) (scale=${scaledTemp}, loc=${this.mutationStepSizeLoc})`,
         );
@@ -466,6 +468,9 @@ export class SAOptimizer extends Optimizer {
             globals.currentRatio = xBest.ratio;
             ratioString = globals.currentRatio.toFixed(4);
             globals.convergence.push(ratioString);
+
+            this.mutationStats.avgMutStepSize =
+              (this.mutationStats.numMut.decision + this.mutationStats.numMut.permutation) / this.nIter;
 
             statistics = genStatistics({
               paddedSeed,

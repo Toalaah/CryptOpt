@@ -44,6 +44,9 @@ export type MutationStats = {
   numRejectedEvals: number;
   numAcceptedEvals: number;
   numUnique: number;
+
+  maxMutStepSize: number;
+  avgMutStepSize: number;
 };
 
 export abstract class Optimizer {
@@ -111,6 +114,9 @@ export abstract class Optimizer {
       numRejectedEvals: 0,
       numAcceptedEvals: 0,
       numUnique: 0,
+
+      maxMutStepSize: 1,
+      avgMutStepSize: 1,
     };
 
     globals.convergence = [];

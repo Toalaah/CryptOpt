@@ -16,3 +16,5 @@ src/bridge/jasmin-bridge/data-libjade/
 .env
 .cryptopt
 .ipynb_checkpoints
+*.ipynb
+/*.csv

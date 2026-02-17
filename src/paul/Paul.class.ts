@@ -138,6 +138,11 @@ export class Paul {
     return Paul.choose(elements, DECISION_IDENTIFIER.DI_CHOOSE_IMM);
   }
 
+  public static chooseWithWeights(weights: number[]): number {
+    const total = sum(weights);
+    return Paul.chooseWithProbabilities(weights.map((n) => n / total));
+  }
+
   public static chooseWithProbabilities(probabilities: number[]): number {
     if (1 - sum(probabilities) > Number.EPSILON) throw new Error("invalid probabily distribution");
     let choice = Math.random();

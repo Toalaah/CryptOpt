@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
+import subprocess
 import json
 import numpy as np
 import os
@@ -21,6 +22,9 @@ def make_args():
     )
     parser.add_argument("--name", "-n", default="run", help="name of output file")
     parser.add_argument(
+        "--measure", "-m", action="store_true", help="re-measure cycle counts"
+    )
+    parser.add_argument(
         "--force",
         "-f",
         action="store_true",
@@ -30,7 +34,51 @@ def make_args():
     return parser.parse_args()
 
 
-def make_row(run: tuple[Path, Path, Path]) -> dict:
+def get_asm_file_from_state_file(state_file: Path):
+    with open(state_file, "r") as f:
+        data = json.load(f)
+        ratio = data["ratio"]
+        ratio = float(str(ratio)[:7])
+        if str(ratio)[-1:] == "5":
+            ratio += 0.00001
+        suffix = "_ratio" + str(round(ratio * 10000)).zfill(5)
+        ratio = np.round(ratio, 5)
+        return state_file.with_name(state_file.stem + suffix).with_suffix(".asm")
+
+
+def remeasure(asm: Path):
+    bs = 150
+    cycles = run_ms(asm, bs=bs)
+    median, stddev = create_statistics(cycles)
+    scaled_median = median / bs
+    scaled_stddev = stddev / bs
+    return scaled_median, scaled_stddev
+
+
+def create_statistics(cycles):
+    q3, q1 = np.percentile(cycles, [75, 25])
+    irq = q3 - q1
+    filtered = list(
+        filter(lambda c: c >= q1 - 1.5 * irq and c <= q3 + 1.5 * irq, cycles)
+    )
+    median = np.median(filtered)
+    stdev = np.std(filtered)
+    return median, stdev
+
+
+def run_ms(asm: Path, n: int = 3, bs: int = 150):
+    cycles = []
+    for _ in range(n):
+        output = subprocess.check_output(["ms", asm.as_posix(), "-b", str(bs)])
+        data = json.loads(output)
+        cycles.extend(data["cycles"][0])
+    return np.array(cycles)
+
+
+def make_row(run: tuple[Path, Path, Path], measure: bool = False) -> dict:
+    scale = lambda n: n / (
+        d["num_evals"] if d["single"] else d["num_evals"] * (1 - d["bet_ratio"])
+    )
     d = {}
     summary_path, state_path, mutation_log = run
     with open(summary_path, "r") as f:
@@ -79,10 +127,16 @@ def make_row(run: tuple[Path, Path, Path]) -> dict:
         d["curve"] = state["parsedArgs"]["curve"]
         d["method"] = state["parsedArgs"]["method"]
         d["num_evals"] = state["parsedArgs"]["evals"]
+        d["num_evals_log"] = np.log(d["num_evals"])
         d["symbol"] = state["parsedArgs"]["symbolname"]
 
         d["bets"] = state["parsedArgs"]["bets"]
         d["bet_ratio"] = state["parsedArgs"]["betRatio"]
+        d["single"] = state["parsedArgs"]["single"]
+
+        d["num_rejected_evals_scaled"] = scale(d["num_rejected_evals"])
+        d["num_accepted_evals_scaled"] = scale(d["num_accepted_evals"])
+        d["num_unique_scaled"] = scale(d["num_unique"])
 
         # These are only relevant if optimizer == 'sa'
         d["sa_initial_temperature"] = state["parsedArgs"]["saInitialTemperature"]
@@ -91,12 +145,25 @@ def make_row(run: tuple[Path, Path, Path]) -> dict:
         d["sa_neighbor_strategy"] = state["parsedArgs"]["saNeighborStrategy"]
         d["sa_num_neighbors"] = state["parsedArgs"]["saNumNeighbors"]
         d["sa_step_size_param"] = state["parsedArgs"]["saStepSizeParam"]
-        d["sa_mut_step_size_max"] = state["parsedArgs"]["saMutStepSizeMax"]
+        d["sa_mut_step_size_max"] = (
+            np.inf
+            if state["parsedArgs"]["saMutStepSizeMax"] is None
+            else state["parsedArgs"]["saMutStepSizeMax"]
+        )
         d["sa_mut_step_size_min"] = state["parsedArgs"]["saMutStepSizeMin"]
         d["sa_mut_step_size_loc"] = state["parsedArgs"]["saMutStepSizeLoc"]
         d["sa_cooling_schedule"] = state["parsedArgs"]["saCoolingSchedule"]
         d["sa_reanneal_ratio"] = state["parsedArgs"]["saReannealRatio"]
         d["sa_reanneal_frequency"] = state["parsedArgs"]["saReannealFrequency"]
+
+    if measure:
+        asm_path = get_asm_file_from_state_file(state_path)
+        median, stddev = remeasure(asm_path)
+        d["cycle_count_median_validate"] = median
+        d["cycle_count_stddev_validate"] = stddev
+    else:
+        d["cycle_count_median_validate"] = np.float64(0)
+        d["cycle_count_stddev_validate"] = np.float64(0)
 
     with open(mutation_log, "r") as f:
         df = pd.read_csv(f)
@@ -121,6 +188,8 @@ def make_row(run: tuple[Path, Path, Path]) -> dict:
                     raise ValueError(f"unexpected value in mutation log: {n}")
         d["num_reject_streak"] = len(reject_streaks)
         d["num_accept_streak"] = len(accept_streaks)
+        d["num_reject_streak_scaled"] = scale(d["num_reject_streak"])
+        d["num_accept_streak_scaled"] = scale(d["num_accept_streak"])
         d["avg_reject_streak"] = np.average(reject_streaks)
         d["avg_accept_streak"] = np.average(accept_streaks)
         pass
@@ -134,6 +203,7 @@ if __name__ == "__main__":
     with_suffix = lambda path, suffix: Path(
         str(path).removesuffix("".join(path.suffixes))
     ).with_suffix(suffix)
+    should_remeasure = args.measure
     runs = list(
         map(
             lambda r: (
@@ -157,10 +227,12 @@ if __name__ == "__main__":
 
     with open(f"{args.name}.csv", "w", newline="") as csvfile:
         w = csv.DictWriter(
-            csvfile, fieldnames=make_row(runs[0]).keys(), quoting=csv.QUOTE_MINIMAL
+            csvfile,
+            fieldnames=make_row(runs[0]).keys(),
+            quoting=csv.QUOTE_MINIMAL,
         )
         w.writeheader()
         for run in runs:
-            w.writerow(make_row(run))
+            w.writerow(make_row(run, measure=should_remeasure))
 
     print(f"Done. Wrote {len(runs)} rows to {args.name}.csv.")

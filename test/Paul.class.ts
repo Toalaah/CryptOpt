@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { C_DI_SPILL_LOCATION, DECISION_IDENTIFIER } from "@/enums";
 import { BIAS, Paul } from "@/paul";
@@ -67,6 +67,77 @@ describe("Paul", () => {
     it("should calculate correct", () => {
       expect(left / limit).toBeLessThan(min + delta / 5);
       expect(right / limit).toBeGreaterThan(max - delta / 5);
+    });
+  });
+
+  describe("chooseWithProbabilities", () => {
+    it("should throw on probabilities that don't sum to 1", () => {
+      expect(() => Paul.chooseWithProbabilities([0.5, 0.3])).toThrow("invalid probabily distribution");
+      expect(() => Paul.chooseWithProbabilities([0.1])).toThrow("invalid probabily distribution");
+      expect(() => Paul.chooseWithProbabilities([])).toThrow("invalid probabily distribution");
+    });
+
+    it("should return 0 for a single-element distribution [1.0]", () => {
+      expect(Paul.chooseWithProbabilities([1.0])).toBe(0);
+    });
+
+    it("should return a valid index", () => {
+      const probs = [0.25, 0.25, 0.25, 0.25];
+      for (let i = 0; i < 100; i++) {
+        const idx = Paul.chooseWithProbabilities(probs);
+        expect(idx).toBeGreaterThanOrEqual(0);
+        expect(idx).toBeLessThan(probs.length);
+      }
+    });
+
+    it("should select index according to cumulative probability", () => {
+      const spy = vi.spyOn(Math, "random");
+      const probs = [0.2, 0.3, 0.5];
+
+      // random=0.1 falls in first bucket [0, 0.2)
+      spy.mockReturnValue(0.1);
+      expect(Paul.chooseWithProbabilities(probs)).toBe(0);
+
+      // random=0.2 lands exactly at boundary -> first bucket (0.2 - 0.2 = 0 <= 0)
+      spy.mockReturnValue(0.2);
+      expect(Paul.chooseWithProbabilities(probs)).toBe(0);
+
+      // random=0.3 falls in second bucket [0.2, 0.5)
+      spy.mockReturnValue(0.3);
+      expect(Paul.chooseWithProbabilities(probs)).toBe(1);
+
+      // random=0.5 lands exactly at second boundary -> second bucket
+      spy.mockReturnValue(0.5);
+      expect(Paul.chooseWithProbabilities(probs)).toBe(1);
+
+      // random=0.51 falls in third bucket [0.5, 1.0)
+      spy.mockReturnValue(0.51);
+      expect(Paul.chooseWithProbabilities(probs)).toBe(2);
+
+      // random=0.99 falls in third bucket
+      spy.mockReturnValue(0.99);
+      expect(Paul.chooseWithProbabilities(probs)).toBe(2);
+
+      spy.mockRestore();
+    });
+
+    it("should respect skewed distributions", () => {
+      const spy = vi.spyOn(Math, "random");
+      const probs = [0.9, 0.05, 0.05];
+
+      // Almost any low random value should select index 0
+      spy.mockReturnValue(0.89);
+      expect(Paul.chooseWithProbabilities(probs)).toBe(0);
+
+      // Just past 0.9 should select index 1
+      spy.mockReturnValue(0.91);
+      expect(Paul.chooseWithProbabilities(probs)).toBe(1);
+
+      // Near 1.0 should select index 2
+      spy.mockReturnValue(0.96);
+      expect(Paul.chooseWithProbabilities(probs)).toBe(2);
+
+      spy.mockRestore();
     });
   });
 });

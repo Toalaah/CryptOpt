@@ -22,8 +22,9 @@ import (
 )
 
 var (
-	benchFile  = flag.String("f", "./scripts/benchmarks.yml", "path to the benchmark YAML file")
-	numWorkers = flag.Int("j", runtime.NumCPU(), "number of parallel jobs (CPUs to use)")
+	benchFile       = flag.String("f", "./scripts/benchmarks.yml", "path to the benchmark YAML file")
+	numWorkers      = flag.Int("j", runtime.NumCPU(), "number of parallel jobs (CPUs to use)")
+	allowDuplicates = flag.Bool("d", false, "don't skip trials if result dir already exists")
 )
 
 type Values []string
@@ -187,7 +188,7 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 	for run := range jobs {
 		id := filepath.Base(run.ResultDir)
 
-		if _, err := os.Stat(run.ResultDir); err == nil {
+		if _, err := os.Stat(run.ResultDir); err == nil && *allowDuplicates {
 			count := completed.Add(1)
 			fmt.Printf("[CPU %d] [%d/%d] Skipping (already exists): %s\n", cpuID, count, total, id)
 			continue
@@ -281,6 +282,7 @@ func main() {
 
 	for _, run := range runs {
 		jobs <- run
+		time.Sleep(time.Millisecond * 250)
 	}
 	close(jobs)
 

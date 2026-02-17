@@ -134,10 +134,6 @@ def make_row(run: tuple[Path, Path, Path], measure: bool = False) -> dict:
         d["bet_ratio"] = state["parsedArgs"]["betRatio"]
         d["single"] = state["parsedArgs"]["single"]
 
-        d["num_rejected_evals_scaled"] = scale(d["num_rejected_evals"])
-        d["num_accepted_evals_scaled"] = scale(d["num_accepted_evals"])
-        d["num_unique_scaled"] = scale(d["num_unique"])
-
         # These are only relevant if optimizer == 'sa'
         d["sa_initial_temperature"] = state["parsedArgs"]["saInitialTemperature"]
         d["sa_visit_param"] = state["parsedArgs"]["saVisitParam"]
@@ -186,13 +182,19 @@ def make_row(run: tuple[Path, Path, Path], measure: bool = False) -> dict:
                     current_accept_streak += 1
                 case n:
                     raise ValueError(f"unexpected value in mutation log: {n}")
+        local_minima = list(filter(lambda n: n > 10, reject_streaks))
+        d["local_minima_evals"] = sum(local_minima)
+        d["local_minima_percentage"] = scale(sum(local_minima))
         d["num_reject_streak"] = len(reject_streaks)
         d["num_accept_streak"] = len(accept_streaks)
         d["num_reject_streak_scaled"] = scale(d["num_reject_streak"])
         d["num_accept_streak_scaled"] = scale(d["num_accept_streak"])
         d["avg_reject_streak"] = np.average(reject_streaks)
         d["avg_accept_streak"] = np.average(accept_streaks)
-        pass
+
+        d["num_rejected_evals_scaled"] = scale(d["num_rejected_evals"])
+        d["num_accepted_evals_scaled"] = scale(d["num_accepted_evals"])
+        d["num_unique_scaled"] = scale(d["num_unique"])
 
     return d
 

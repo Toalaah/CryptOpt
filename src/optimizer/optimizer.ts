@@ -33,6 +33,7 @@ import { createHash } from "crypto";
 export type OptimizerResult = {
   ratio: number;
   cycleCount: number;
+  numEvals: number;
 };
 
 export type MutationStats = {

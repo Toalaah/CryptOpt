@@ -250,6 +250,7 @@ const summary = [
   `${cy}${bd}Best epoch (by cycle)${re}: (epoch=${gn}${lastRun.bestEpochByCycle.epoch}${re}) (ratio=${gn}${lastRun.bestEpochByCycle.ratio}${re}) (evals=${gn}${lastRun.bestEpochByCycle.nEvals}${re}) (cycle_count=${gn}${lastRun.bestEpochByCycle.cycleCount}${re})`,
   `${cy}${bd}Best epoch (by ratio)${re}: (epoch=${gn}${lastRun.bestEpochByRatio.epoch}${re}) (ratio=${gn}${lastRun.bestEpochByRatio.ratio}${re}) (evals=${gn}${lastRun.bestEpochByRatio.nEvals}${re}) (cycle_count=${gn}${lastRun.bestEpochByRatio.cycleCount}${re})`,
   `${cy}${bd}Mutation statistics${re}: ${JSON.stringify(lastRun.mutationStats, null, 2)}`,
+  `${cy}${bd}Total evals consumed${re}: ${lastRun.numEvals}`,
   `${cy}${bd}Final ratio${re}: ${gn}${lastRun.ratio}${re}`,
   `${cy}${bd}Final cycle count (median)${re}: ${gn}${lastRun.cycleCount}${re}`,
 ].join("\n");

@@ -170,8 +170,8 @@ export class SAOptimizer extends Optimizer {
     let accumulatedTimeSpentByMeasuring = 0;
     let numEvals = 0; // NB: numEvals does not necessarily == iteration loop, as multiple neighbors implies multiple evaluations per loop.
     let currentEpoch = 0;
-    const reannealThresh = this.initialTemperature * this.reAnnealRatio;
-    let tempStep = 0; // Separate tracking of temperature step as we may reset it when re-annealing, thus breaking the prior invariant of epoch == tempStep.
+    // const reannealThresh = this.initialTemperature * this.reAnnealRatio;
+    let annealingIndex = 0; // Separate tracking of annealing step as we may reset it when re-annealing, thus breaking the prior invariant of epoch == annealingIndex.
     let xBest: State = { asm: "", ratio: -1, cycleCount: -1 }; // Add slot for storing the best result we see.
     let temperature = 0;
     let showPerSecond = "many/s";
@@ -179,6 +179,10 @@ export class SAOptimizer extends Optimizer {
 
     let currentAcceptStreak = 0;
     let currentRejectStreak = 0;
+
+    // Used to track how when we should reanneal.
+    let numAccepted = 0;
+    let numRejected = 0;
     // Various helpers used in main optimization loop below.
 
     /**
@@ -186,26 +190,39 @@ export class SAOptimizer extends Optimizer {
      */
     const shouldStop = () => numEvals >= this.nIter;
     // const shouldStop = () =>
-    //   numEvals >= this.nIter || this.numMut.permutation + this.numMut.decision >= this.nIter;
+    //   numEvals >= this.nIter ||
+    //   this.mutationStats.numMut.permutation + this.mutationStats.numMut.decision >= this.nIter;
 
-    const shouldReanneal = () => currentRejectStreak >= this.maxNoImproveStreak;
-    // const shouldReanneal = () => currentRejectStreak >= this.maxNoImproveStreak && tempStep >= 1000;
-    // const shouldReanneal = () =>
-    //   temperature < reannealThresh || currentRejectStreak >= this.maxNoImproveStreak;
+    // const shouldResetToBest = () => currentRejectStreak >= this.maxNoImproveStreak;
 
-    /**
-     * Updates best result.
-     */
-    const updateBest = (state: State) => {
-      // Could also filter by raw cycle count here, may have to experiment with what actually delivers better results.
-      if (state.cycleCount >= xBest.cycleCount && xBest.cycleCount > 0) return;
-      xBest.asm = state.asm;
-      xBest.ratio = state.ratio;
-      xBest.cycleCount = state.cycleCount;
+    // const shouldReanneal = () => currentRejectStreak >= this.maxNoImproveStreak;
+    const shouldReanneal = () => {
+      if (numAccepted > 200) {
+        numAccepted = 0;
+        return true;
+      }
+      if (numRejected > 100) {
+        numRejected = 0;
+        return true;
+      }
+      return false;
+      // return temperature < reannealThresh || currentRejectStreak >= this.maxNoImproveStreak;
     };
 
     /**
-     * Samples a neighbor and saves it into `slot`. The model snapshot is saved with an `id` of `slot.toString()`. Returns the number of permutations/decisions which were made to sample the neighbor.
+     * Updates best result. Returns true if best was improved, else false.
+     */
+    const updateBest = (state: State) => {
+      // Could also filter by raw cycle count here, may have to experiment with what actually delivers better results.
+      if (state.cycleCount >= xBest.cycleCount && xBest.cycleCount > 0) return false;
+      xBest.asm = state.asm;
+      xBest.ratio = state.ratio;
+      xBest.cycleCount = state.cycleCount;
+      return true;
+    };
+
+    /**
+     * Samples a neighbor and saves it into Model snaphshot `slot`. The model snapshot is saved with an `id` of `slot.toString()`. Returns the number of permutations/decisions which were made to sample the neighbor.
      */
     const sampleNeighbor = (slot: number, temp: number) => {
       const numMuts = (() => {
@@ -268,15 +285,15 @@ export class SAOptimizer extends Optimizer {
       }
 
       const intervalHandle = setInterval(() => {
-        temperature = this.coolingSchedule(tempStep);
+        temperature = this.coolingSchedule(annealingIndex);
         if (temperature <= 0) errorOut({ exitCode: 123, msg: "temperature <= 0" });
         FileLogger.log(`epoch ${currentEpoch}, temp=${temperature}`);
 
         // Determine whether to re-anneal.
         if (shouldReanneal()) {
           FileLogger.log(`reannealing`);
-          tempStep = 0;
-          temperature = this.coolingSchedule(tempStep);
+          annealingIndex = 0;
+          temperature = this.coolingSchedule(annealingIndex);
         }
 
         // Mutation & candidate generation.
@@ -332,13 +349,14 @@ export class SAOptimizer extends Optimizer {
         const meanrawCandidate = analyseResult.rawMedian[neighborIdx];
         const meanrawCheck = analyseResult.rawMedian[analyseResult.rawMedian.length - 1];
 
+        let didSeeBest = false;
         // Update batch size & best result.
         this.updateBatchSize(meanrawCheck);
         for (let i = 0; i < analyseResult.rawMedian.length - 1; ++i) {
           const res = analyseResult.rawMedian[i];
           const ratio = meanrawCheck / res;
           const cycleCount = analyseResult.batchSizeScaledrawMedian[i];
-          updateBest({ asm: candidates[i].asm, ratio, cycleCount });
+          didSeeBest = updateBest({ asm: candidates[i].asm, ratio, cycleCount }) && neighborIdx === i;
         }
 
         // Decide whether we want to keep mutated candidate.
@@ -347,6 +365,7 @@ export class SAOptimizer extends Optimizer {
           (kept = this.shouldAccept(this.energy(meanrawCurrent), this.energy(meanrawCandidate), temperature))
         ) {
           this.mutationStats.numAcceptedEvals++;
+          numAccepted++;
           currentRejectStreak = 0;
           currentAcceptStreak++;
           this.mutationStats.maxAcceptStreak = Math.max(
@@ -363,6 +382,7 @@ export class SAOptimizer extends Optimizer {
           Model.restoreSnapshot(neighborIdx.toString());
         } else {
           this.mutationStats.numRejectedEvals++;
+          numRejected++;
           currentAcceptStreak = 0;
           currentRejectStreak++;
           this.mutationStats.maxRejectStreak = Math.max(
@@ -452,7 +472,7 @@ export class SAOptimizer extends Optimizer {
         } // End statistics
 
         currentEpoch++;
-        tempStep++;
+        annealingIndex++;
 
         // Start cleanup
         {
@@ -470,7 +490,7 @@ export class SAOptimizer extends Optimizer {
             globals.convergence.push(ratioString);
 
             this.mutationStats.avgMutStepSize =
-              (this.mutationStats.numMut.decision + this.mutationStats.numMut.permutation) / this.nIter;
+              (this.mutationStats.numMut.decision + this.mutationStats.numMut.permutation) / currentEpoch;
 
             statistics = genStatistics({
               paddedSeed,
@@ -531,6 +551,7 @@ export class SAOptimizer extends Optimizer {
             resolve({
               ratio: xBest.ratio,
               cycleCount: xBest.cycleCount,
+              numEvals: currentEpoch,
             });
           }
         } // End cleanup

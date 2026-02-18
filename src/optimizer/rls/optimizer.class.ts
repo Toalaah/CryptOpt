@@ -355,6 +355,7 @@ export class RLSOptimizer extends Optimizer {
             resolve({
               ratio: currentRatio,
               cycleCount: currentCycleCount,
+              numEvals,
             });
           }
         }

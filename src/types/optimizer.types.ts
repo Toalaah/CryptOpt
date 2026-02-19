@@ -31,6 +31,9 @@ export type OptimizerArgs = {
   curve: CURVE_T;
   method: METHOD_T;
   optimizer: OPTIMIZER_STRATEGY_T;
+  // START TABU-specific args
+  tabuUniqueFactorGoal: number;
+  // END TABU-specific args
   // START SA-specific args
   saInitialTemperature: number;
   saAcceptParam: number;

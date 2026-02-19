@@ -68,6 +68,15 @@ export const parsedArgs = y
     describe: "Optimizer strategy to use.",
     choices: OPTIMIZER_STRATEGIES,
   })
+  // START TABU-specific args
+  .option("tabuUniqueFactorGoal", {
+    number: true,
+    default: 0.9,
+    max: 1,
+    min: 0,
+    describe: "Goal percentage of solutions which should be unique.",
+  })
+  // END TABU-specific args
   // START SA-specific args
   .option("saInitialTemperature", {
     number: true,
@@ -284,15 +293,15 @@ export const parsedArgs = y
       return Math.pow(1000, idx + 1) * Number(evals.substring(0, evals.length - 1));
     },
   })
-  .check(({ evals, bridge, cFile, jsonFile, method, curve, saMinMutStepSize, saMaxMutStepSize }) => {
+  .check(({ evals, bridge, cFile, jsonFile, method, curve, saMutStepSizeMax, saMutStepSizeMin }) => {
     if (evals <= 0) {
       throw new Error("--evals must be >0");
     }
     if (bridge == "manual" && (!jsonFile || !cFile)) {
       throw new Error("Bridge is set to manual, but either json or c file is not specified.");
     }
-    if (saMinMutStepSize > saMaxMutStepSize) {
-      throw new Error("--saMinMutStepSize must be <= --saMaxMutStepSize");
+    if (saMutStepSizeMin > saMutStepSizeMax) {
+      throw new Error("--saMutStepSizeMin must be <= --saMutStepSizeMax");
     }
     if (["", "fiat"].includes(bridge)) {
       if (!FIAT_METHODS.includes(method as FIAT_METHOD_T)) {

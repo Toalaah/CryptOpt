@@ -88,11 +88,11 @@ export class RLSOptimizer extends Optimizer {
         if (this.args.verbose) {
           const c = code.join("\n");
           writeString(pathResolve(this.libcheckfunctionDirectory, "current.asm"), c);
-          this.hashASM(c);
+          this.addToSeen(c);
           this.asmStrings[currentNameOfTheFunctionThatHasTheMutation] = c;
         } else {
           const c = filteredInstructions.join("\n");
-          this.hashASM(c);
+          this.addToSeen(c);
           this.asmStrings[currentNameOfTheFunctionThatHasTheMutation] = c;
         }
 

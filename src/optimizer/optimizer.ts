@@ -65,7 +65,13 @@ export abstract class Optimizer {
   protected choice: CHOICE;
 
   protected asmHashes: Set<string>;
-  protected hashASM(asm: asm) {
+
+  protected isNew(asm: asm) {
+    const hash = createHash("md5").update(asm).digest("hex");
+    return !this.asmHashes.has(hash);
+  }
+
+  protected addToSeen(asm: asm) {
     this.asmHashes.add(createHash("md5").update(asm).digest("hex"));
     this.mutationStats.numUnique = this.asmHashes.size;
   }
@@ -175,7 +181,7 @@ export abstract class Optimizer {
   protected mutateBatch(n: number): { perm: number; decision: number } {
     let perm = 0;
     let decision = 0;
-    for (let i = 0; i < n; ++i) {
+    for (let i = 0; i < n; i++) {
       this.choice = Paul.pick([CHOICE.PERMUTE, CHOICE.DECISION]);
       switch (this.choice) {
         case CHOICE.PERMUTE: {

@@ -260,7 +260,7 @@ export class SAOptimizer extends Optimizer {
             return filteredInstructions.join("\n");
         }
       })();
-      this.hashASM(asm);
+      this.addToSeen(asm);
       candidates[slot].asm = asm;
       candidates[slot].stacklength = assembleResult.stacklength;
       candidates[slot].ninst = filteredInstructions.length;

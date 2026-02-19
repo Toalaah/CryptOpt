@@ -138,7 +138,11 @@ func makeRunID(params map[string]string) string {
 	}
 	sort.Strings(extra)
 	for _, k := range extra {
-		parts = append(parts, k+"="+params[k])
+		if params[k] == "" {
+			parts = append(parts, k)
+		} else {
+			parts = append(parts, k+"="+params[k])
+		}
 	}
 
 	return strings.Join(parts, "--")
@@ -188,7 +192,7 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 	for run := range jobs {
 		id := filepath.Base(run.ResultDir)
 
-		if _, err := os.Stat(run.ResultDir); err == nil && *allowDuplicates {
+		if _, err := os.Stat(run.ResultDir); err == nil && !(*allowDuplicates) {
 			count := completed.Add(1)
 			fmt.Printf("[CPU %d] [%d/%d] Skipping (already exists): %s\n", cpuID, count, total, id)
 			continue
@@ -241,6 +245,10 @@ func main() {
 	var benchmarks map[string]Benchmark
 	if err := yaml.Unmarshal(data, &benchmarks); err != nil {
 		log.Fatalf("Failed to parse benchmarks.yml: %v", err)
+	}
+
+	if *allowDuplicates {
+		fmt.Printf("Allowing duplicates\n")
 	}
 
 	bench, ok := benchmarks[benchName]

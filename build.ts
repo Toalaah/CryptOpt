@@ -46,14 +46,31 @@ Bun.build({
 });
 
 // Build scripts & measurement tools.
-for (const script of ["./scripts/GraphMutatedVariants.ts", "./scripts/TestEquivalence.ts"]) {
-  console.log(`Building tool: ${path.basename(script, ".ts")}`);
-  Bun.build({
-    tsconfig: tsconfigPath,
-    entrypoints: [script],
-    target: "node",
-    minify: !debug,
-    outdir: "dist",
-    external: ["*.node"],
-  });
+for (const script of [
+  "./scripts/GraphMutatedVariants.ts",
+  "./scripts/TestEquivalence.ts",
+  "./scripts/bench.go",
+]) {
+  const toolName = path.basename(path.basename(script, ".ts"), ".go");
+  console.log(`Building tool: ${toolName}`);
+  if (script.endsWith(".go")) {
+    const proc = Bun.spawn(["go", "build", script], {
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    const exitCode = await proc.exited;
+    if (exitCode !== 0) {
+      console.error(`Failed to build tool ${script}!`);
+      process.exit(exitCode);
+    }
+  } else {
+    Bun.build({
+      tsconfig: tsconfigPath,
+      entrypoints: [script],
+      target: "node",
+      minify: !debug,
+      outdir: "dist",
+      external: ["*.node"],
+    });
+  }
 }

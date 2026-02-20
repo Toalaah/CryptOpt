@@ -66,7 +66,6 @@ export class TabuOptimizer extends Optimizer {
       mutStats: { numDecision: number; numPerm: number };
     };
     type State = { asm: string; ratio: number; cycleCount: number };
-    let xBest: State = { asm: "", ratio: -1, cycleCount: -1 };
 
     const CURRENT_FUNCTION = 0 as const;
     const CANDIDATE_FUNCTION = 1 as const;
@@ -95,18 +94,6 @@ export class TabuOptimizer extends Optimizer {
 
     let currentRejectStreak = 0;
     let currentAcceptStreak = 0;
-
-    /**
-     * Updates best result. Returns true if best was improved, else false.
-     */
-    const updateBest = (state: State) => {
-      // Could also filter by raw cycle count here, may have to experiment with what actually delivers better results.
-      if (state.cycleCount >= xBest.cycleCount && xBest.cycleCount > 0) return false;
-      xBest.asm = state.asm;
-      xBest.ratio = state.ratio;
-      xBest.cycleCount = state.cycleCount;
-      return true;
-    };
 
     const assemble = (slot: number) => {
       Logger.log("assembling");
@@ -147,16 +134,17 @@ export class TabuOptimizer extends Optimizer {
       if (currUniqueFactor < this.uniquenessGoal) {
         // Ensure we add unique solution if under current threshold goal.
         while (true) {
-          const res = this.mutateBatch(1);
-          perm += res.perm;
-          desc += res.decision;
+          this.mutate();
+          perm += this.choice === CHOICE.PERMUTE ? 1 : 0;
+          desc += this.choice === CHOICE.DECISION ? 1 : 0;
           asm = assemble(slot);
           if (this.isNew(asm)) break;
+          this.revertFunction();
         }
       } else {
-        const res = this.mutateBatch(1);
-        perm += res.perm;
-        desc += res.decision;
+        this.mutate();
+        perm += this.choice === CHOICE.PERMUTE ? 1 : 0;
+        desc += this.choice === CHOICE.DECISION ? 1 : 0;
         asm = assemble(slot);
       }
       this.addToSeen(asm);
@@ -225,15 +213,8 @@ export class TabuOptimizer extends Optimizer {
         const meanrawCandidate = analyseResult.rawMedian[CANDIDATE_FUNCTION];
         const meanrawCheck = analyseResult.rawMedian[CHECK];
 
-        let didSeeBest = false;
         // Update batch size & best result.
         this.updateBatchSize(meanrawCheck);
-        for (let i = 0; i < candidates.length; ++i) {
-          const res = analyseResult.rawMedian[i];
-          const ratio = meanrawCheck / res;
-          const cycleCount = analyseResult.batchSizeScaledrawMedian[i];
-          didSeeBest = updateBest({ asm: candidates[i].asm, ratio, cycleCount });
-        }
 
         // Decide whether we want to keep mutated candidate.
         let kept: boolean;
@@ -271,6 +252,7 @@ export class TabuOptimizer extends Optimizer {
           this.mutationStats.numRevert.decision += candidates[CANDIDATE_FUNCTION].mutStats.numDecision;
         }
 
+        let currentCycleCount: number;
         // Start statistics & status update.
         {
           const indexGood = kept ? CANDIDATE_FUNCTION : CURRENT_FUNCTION;
@@ -280,7 +262,7 @@ export class TabuOptimizer extends Optimizer {
           const minRaw = Math.min(meanrawCurrent, meanrawCandidate);
 
           const currentRatio = meanrawCheck / minRaw;
-          const currentCycleCount = analyseResult.batchSizeScaledrawMedian[indexGood];
+          currentCycleCount = analyseResult.batchSizeScaledrawMedian[indexGood];
           globals.currentRatio = currentRatio;
 
           // Update globals w.r.t best ratios/cycle counts.
@@ -359,7 +341,6 @@ export class TabuOptimizer extends Optimizer {
             const elapsed = Date.now() - optimistaionStartDate;
             const paddedSeed = padSeed(Paul.initialSeed);
 
-            globals.currentRatio = xBest.ratio;
             ratioString = globals.currentRatio.toFixed(4);
             globals.convergence.push(ratioString);
 
@@ -393,7 +374,7 @@ export class TabuOptimizer extends Optimizer {
               writeString(
                 asmFile,
                 ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
-                  .concat(xBest.asm)
+                  .concat(candidates[CURRENT_FUNCTION].asm)
                   .concat(statistics)
                   .join("\n"),
               );
@@ -423,8 +404,8 @@ export class TabuOptimizer extends Optimizer {
             const v = this.measuresuite.destroy();
             Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
             resolve({
-              ratio: xBest.ratio,
-              cycleCount: xBest.cycleCount,
+              ratio: globals.currentRatio,
+              cycleCount: currentCycleCount,
               numEvals: currentEpoch,
             });
           }

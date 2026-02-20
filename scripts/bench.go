@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -22,9 +23,10 @@ import (
 )
 
 var (
-	benchFile       = flag.String("f", "./scripts/benchmarks.yml", "path to the benchmark YAML file")
-	numWorkers      = flag.Int("j", runtime.NumCPU(), "number of parallel jobs (CPUs to use)")
-	allowDuplicates = flag.Bool("d", false, "don't skip trials if result dir already exists")
+	benchFile       = flag.String("f", "./scripts/benchmarks.yml", "path to the benchmark YAML file (env: $BENCHMARK_CONFIG)")
+	numWorkers      = flag.Int("j", runtime.NumCPU(), "number of parallel jobs (CPUs to use) (env: $BENCHMARK_NUM_WORKERS)")
+	allowDuplicates = flag.Bool("d", false, "don't skip trials if result dir already exists (env: $BENCHMARK_ALLOW_DUPLICATES)")
+	baseDir         = flag.String("b", ".", "relative path to where results should be stored (env: $BENCHMARK_BASE_DIR)")
 )
 
 type Values []string
@@ -239,6 +241,26 @@ func main() {
 	}
 	benchName := flag.Arg(0)
 
+	if path, ok := os.LookupEnv("BENCHMARK_BASE_DIR"); ok {
+		*baseDir = path
+	}
+
+	if path, ok := os.LookupEnv("BENCHMARK_CONFIG"); ok {
+		*benchFile = path
+	}
+
+	if _, ok := os.LookupEnv("BENCHMARK_ALLOW_DUPLICATES"); ok {
+		*allowDuplicates = true
+	}
+
+	if val, ok := os.LookupEnv("BENCHMARK_NUM_WORKERS"); ok {
+		n, err := strconv.ParseUint(val, 10, 32)
+		if err != nil {
+			log.Fatalf("Failed to parse num workers from env: %v", err)
+		}
+		*numWorkers = int(n)
+	}
+
 	data, err := os.ReadFile(*benchFile)
 	if err != nil {
 		log.Fatalf("Failed to read %s: %v", *benchFile, err)
@@ -266,7 +288,11 @@ func main() {
 	fields := getActiveFields(bench)
 	combos := crossProduct(fields)
 
-	baseDir := fmt.Sprintf("./results-%s", benchName)
+	if err := os.MkdirAll(*baseDir, 0755); err != nil {
+		log.Fatalf("Failed to create base directory: %v", err)
+	}
+
+	baseDir := path.Join(*baseDir, fmt.Sprintf("./results-%s", benchName))
 	runs := make([]Run, len(combos))
 	for i, combo := range combos {
 		runs[i] = makeRun(combo, baseDir)

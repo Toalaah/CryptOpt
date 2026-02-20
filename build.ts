@@ -1,5 +1,6 @@
 import { Copy } from "./copyplugin";
 import { Strip } from "bun-plugin-strip";
+import { spawnSync } from "bun";
 
 import fs from "fs";
 import path from "path";
@@ -45,6 +46,15 @@ Bun.build({
   ],
 });
 
+const hasExecutable = (bin: string) => {
+  const res = spawnSync({
+    cmd: ["which", bin],
+    stderr: "ignore",
+    stdout: "ignore",
+  });
+  return res.exitCode === 0;
+};
+
 // Build scripts & measurement tools.
 for (const script of [
   "./scripts/GraphMutatedVariants.ts",
@@ -52,8 +62,9 @@ for (const script of [
   "./scripts/bench.go",
 ]) {
   const toolName = path.basename(path.basename(script, ".ts"), ".go");
-  console.log(`Building tool: ${toolName}`);
   if (script.endsWith(".go")) {
+    if (!hasExecutable("go")) continue;
+    console.log(`Building tool: ${toolName}`);
     const proc = Bun.spawn(["go", "build", script], {
       stdout: "inherit",
       stderr: "inherit",
@@ -64,6 +75,7 @@ for (const script of [
       process.exit(exitCode);
     }
   } else {
+    console.log(`Building tool: ${toolName}`);
     Bun.build({
       tsconfig: tsconfigPath,
       entrypoints: [script],

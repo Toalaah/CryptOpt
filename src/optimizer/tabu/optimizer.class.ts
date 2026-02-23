@@ -64,7 +64,6 @@ export class TabuOptimizer extends Optimizer {
       ninst: number;
       mutStats: { numDecision: number; numPerm: number };
     };
-    type State = { asm: string; ratio: number; cycleCount: number };
 
     const CURRENT_FUNCTION = 0 as const;
     const CANDIDATE_FUNCTION = 1 as const;
@@ -126,28 +125,24 @@ export class TabuOptimizer extends Optimizer {
      * Samples a neighbor and saves it into Model snaphshot `slot`. The model snapshot is saved with an `id` of `slot.toString()`. Returns the number of permutations/decisions which were made to sample the neighbor.
      */
     const sampleNeighbor = (slot: number) => {
-      let perm = 0;
-      let desc = 0;
       let asm = "";
       const currUniqueFactor = getCurrentUniqueFactor();
-      if (currUniqueFactor < this.uniquenessGoal) {
+      if (currUniqueFactor <= this.uniquenessGoal) {
         // Ensure we add unique solution if under current threshold goal.
         while (true) {
-          this.mutate();
-          perm += this.choice === CHOICE.PERMUTE ? 1 : 0;
-          desc += this.choice === CHOICE.DECISION ? 1 : 0;
+          this.mutate({ updateStats: false });
           asm = assemble(slot);
           if (this.isNew(asm)) break;
-          this.revertFunction();
+          else Model.revertLastMutation();
         }
       } else {
-        this.mutate();
-        perm += this.choice === CHOICE.PERMUTE ? 1 : 0;
-        desc += this.choice === CHOICE.DECISION ? 1 : 0;
+        this.mutate({ updateStats: false });
         asm = assemble(slot);
       }
       this.addToSeen(asm);
       Model.saveSnaphot(slot.toString());
+      const perm = this.choice == CHOICE.PERMUTE ? 1 : 0;
+      const desc = 1 - perm;
       return { perm, desc };
     };
 
@@ -163,21 +158,21 @@ export class TabuOptimizer extends Optimizer {
       // Before running the optimization loop, assemble the baseline program (at this point, no mutations have taken place).
       {
         const asm = assemble(CURRENT_FUNCTION);
+        this.addToSeen(asm);
         // Check for errors, if nothing happens here we are probably fine for the rest of the run.
         if (asm.includes("undefined"))
           errorOut({ msg: "ASM string empty/undefined, big yikes", exitCode: 1 });
       }
 
       const intervalHandle = setInterval(() => {
-        const currentEpoch = numEvals;
         // Mutation & candidate generation.
         {
           Model.saveSnaphot("current");
           const { perm, desc } = sampleNeighbor(CANDIDATE_FUNCTION);
-          this.mutationStats.numMut.permutation += perm;
-          this.mutationStats.numMut.decision += desc;
           candidates[CANDIDATE_FUNCTION].mutStats.numPerm = perm;
           candidates[CANDIDATE_FUNCTION].mutStats.numDecision = desc;
+          this.mutationStats.numMut.permutation += perm;
+          this.mutationStats.numMut.decision += desc;
           candidates[CANDIDATE_FUNCTION].choice = this.choice;
           Model.restoreSnapshot("current");
         }
@@ -268,7 +263,7 @@ export class TabuOptimizer extends Optimizer {
           {
             if (currentRatio > globals.bestEpochByRatio.ratio) {
               // Check if we found new PB this epoch.
-              globals.bestEpochByRatio.epoch = currentEpoch;
+              globals.bestEpochByRatio.epoch = numEvals;
               globals.bestEpochByRatio.nEvals = numEvals;
               globals.bestEpochByRatio.ratio = currentRatio;
               globals.bestEpochByRatio.cycleCount = currentCycleCount;
@@ -277,7 +272,7 @@ export class TabuOptimizer extends Optimizer {
             if (currentCycleCount < globals.bestEpochByCycle.cycleCount) {
               globals.bestEpochByCycle.result = analyseResult;
               globals.bestEpochByCycle.indexGood = indexGood;
-              globals.bestEpochByCycle.epoch = currentEpoch;
+              globals.bestEpochByCycle.epoch = numEvals;
               globals.bestEpochByCycle.ratio = currentRatio;
               globals.bestEpochByCycle.nEvals = numEvals;
               globals.bestEpochByCycle.cycleCount = currentCycleCount;
@@ -296,13 +291,13 @@ export class TabuOptimizer extends Optimizer {
             choice: this.choice,
             kept,
             numEvals: numEvals,
-            epoch: currentEpoch,
+            epoch: numEvals,
             nDesc: candidates[CANDIDATE_FUNCTION].mutStats.numDecision,
             nPerm: candidates[CANDIDATE_FUNCTION].mutStats.numPerm,
             ratio: currentRatio,
           });
 
-          if (currentEpoch % PRINT_EVERY == 0) {
+          if (numEvals % PRINT_EVERY == 0) {
             const statusline = genStatusLine({
               ...this.args,
               logComment: this.args.logComment,
@@ -345,7 +340,7 @@ export class TabuOptimizer extends Optimizer {
             globals.convergence.push(ratioString);
 
             this.mutationStats.avgMutStepSize =
-              (this.mutationStats.numMut.decision + this.mutationStats.numMut.permutation) / currentEpoch;
+              (this.mutationStats.numMut.decision + this.mutationStats.numMut.permutation) / numEvals;
 
             statistics = genStatistics({
               paddedSeed,
@@ -406,7 +401,7 @@ export class TabuOptimizer extends Optimizer {
             resolve({
               ratio: globals.currentRatio,
               cycleCount: currentCycleCount,
-              numEvals: currentEpoch,
+              numEvals: numEvals,
             });
           }
         } // End cleanup

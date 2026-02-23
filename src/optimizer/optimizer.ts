@@ -205,7 +205,11 @@ export abstract class Optimizer {
     return { perm, decision };
   }
 
-  protected mutate(random: boolean = true): void {
+  protected mutate(
+    a: { random?: boolean; updateStats?: boolean } = { random: true, updateStats: true },
+  ): void {
+    const random = a.random ?? true;
+    const updateStats = a.updateStats ?? true;
     if (random) {
       this.choice = Paul.pick([CHOICE.PERMUTE, CHOICE.DECISION]);
     }
@@ -214,10 +218,10 @@ export abstract class Optimizer {
       case CHOICE.PERMUTE: {
         Model.mutatePermutation();
         this.revertFunction = () => {
-          this.mutationStats.numRevert.permutation++;
+          if (updateStats) this.mutationStats.numRevert.permutation++;
           Model.revertLastMutation();
         };
-        this.mutationStats.numMut.permutation++;
+        if (updateStats) this.mutationStats.numMut.permutation++;
         break;
       }
       case CHOICE.DECISION: {
@@ -225,15 +229,14 @@ export abstract class Optimizer {
         if (!hasHappend) {
           // this is the case, if there is no hot decisions.
           this.choice = CHOICE.PERMUTE;
-          this.mutate(false);
+          this.mutate({ random: false, updateStats });
           return;
         }
         this.revertFunction = () => {
-          this.mutationStats.numRevert.decision++;
+          if (updateStats) this.mutationStats.numRevert.decision++;
           Model.revertLastMutation();
         };
-
-        this.mutationStats.numMut.decision++;
+        if (updateStats) this.mutationStats.numMut.decision++;
       }
     }
   }

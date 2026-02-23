@@ -444,6 +444,7 @@ export class SAOptimizer extends Optimizer {
             epoch: currentEpoch,
             nDesc: candidates[neighborIdx].mutStats.numDecision,
             nPerm: candidates[neighborIdx].mutStats.numPerm,
+            ratio: currentRatio,
           });
 
           if (currentEpoch % PRINT_EVERY == 0) {

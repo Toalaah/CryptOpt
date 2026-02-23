@@ -128,7 +128,7 @@ export abstract class Optimizer {
 
     globals.convergence = [];
     globals.mutationLog = [
-      "epoch,evaluation,nPerm,nDesc,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
+      "epoch,evaluation,nPerm,nDesc,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall,ratio",
     ];
     globals.bestEpochByRatio = { ratio: 0, epoch: 0, nEvals: 0, cycleCount: 0 };
     globals.bestEpochByCycle = {

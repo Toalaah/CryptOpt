@@ -16,11 +16,11 @@
 
 import { execSync } from "child_process";
 import { appendFileSync } from "fs";
-import { join, resolve as pathResolve } from "path";
+import { resolve as pathResolve } from "path";
 
 import { assemble as assembleASM, strip } from "@/assembler";
 import { FiatBridge } from "@/bridge/fiat-bridge";
-import { CHOICE, FUNCTIONS } from "@/enums";
+import { CHOICE } from "@/enums";
 import { errorOut, ERRORS } from "@/errors";
 import {
   analyseMeasureResult,
@@ -29,13 +29,12 @@ import {
   padSeed,
   PRINT_EVERY,
   shouldProof as shouldProve,
-  toggleFUNCTIONS,
   writeString,
 } from "@/helper";
 import globals from "@/helper/globals";
 import { Logger } from "@/helper/Logger.class";
 import { Model } from "@/model";
-import type { AnalyseResult, OptimizerArgs } from "@/types";
+import type { OptimizerArgs } from "@/types";
 
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "../util";
 import { Optimizer, OptimizerResult } from "@/optimizer";
@@ -300,6 +299,7 @@ export class TabuOptimizer extends Optimizer {
             epoch: currentEpoch,
             nDesc: candidates[CANDIDATE_FUNCTION].mutStats.numDecision,
             nPerm: candidates[CANDIDATE_FUNCTION].mutStats.numPerm,
+            ratio: currentRatio,
           });
 
           if (currentEpoch % PRINT_EVERY == 0) {

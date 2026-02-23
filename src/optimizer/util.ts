@@ -125,6 +125,7 @@ export function logMutation({
   numEvals,
   nPerm,
   nDesc,
+  ratio,
 }: {
   choice: CHOICE;
   epoch: number;
@@ -132,6 +133,7 @@ export function logMutation({
   kept: boolean;
   nPerm?: number;
   nDesc?: number;
+  ratio: number;
 }): void {
   const pDetails = choice == " P" ? Model.permutationStats : "                      ";
   const dDetails = choice == "D " ? Model.decisionStats : "             ";
@@ -149,6 +151,7 @@ export function logMutation({
       kept ? 1 : 0,
       pDetails,
       dDetails,
+      ratio,
     ].join(","),
   );
 }

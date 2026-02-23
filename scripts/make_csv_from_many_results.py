@@ -152,6 +152,8 @@ def make_row(run: tuple[Path, Path, Path], measure: bool = False) -> dict:
         d["sa_reanneal_ratio"] = state["parsedArgs"]["saReannealRatio"]
         d["sa_reanneal_frequency"] = state["parsedArgs"]["saReannealFrequency"]
 
+        d["tabu_unique_factor_goal"] = state["parsedArgs"]["tabuUniqueFactorGoal"]
+
     if measure:
         asm_path = get_asm_file_from_state_file(state_path)
         median, stddev = remeasure(asm_path)

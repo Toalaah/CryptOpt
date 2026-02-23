@@ -23,10 +23,9 @@ import (
 )
 
 var (
-	benchFile       = flag.String("f", "./scripts/benchmarks.yml", "path to the benchmark YAML file (env: $BENCHMARK_CONFIG)")
-	numWorkers      = flag.Int("j", runtime.NumCPU(), "number of parallel jobs (CPUs to use) (env: $BENCHMARK_NUM_WORKERS)")
-	allowDuplicates = flag.Bool("d", false, "don't skip trials if result dir already exists (env: $BENCHMARK_ALLOW_DUPLICATES)")
-	baseDir         = flag.String("b", ".", "relative path to where results should be stored (env: $BENCHMARK_BASE_DIR)")
+	benchFile  = flag.String("f", "./scripts/benchmarks.yml", "path to the benchmark YAML file (env: $BENCHMARK_CONFIG)")
+	numWorkers = flag.Int("j", runtime.NumCPU(), "number of parallel jobs (CPUs to use) (env: $BENCHMARK_NUM_WORKERS)")
+	baseDir    = flag.String("b", ".", "relative path to where results should be stored (env: $BENCHMARK_BASE_DIR)")
 )
 
 type Values []string
@@ -196,20 +195,27 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 	for run := range jobs {
 		id := filepath.Base(run.ResultDir)
 
-		if _, err := os.Stat(run.ResultDir); err == nil && !(*allowDuplicates) {
+		if _, err := os.Stat(run.ResultDir); err == nil {
 			count := completed.Add(1)
 			fmt.Printf("[CPU %d] [%d/%d] Skipping (already exists): %s\n", cpuID, count, total, id)
 			continue
 		}
 
-		if err := os.MkdirAll(run.ResultDir, 0755); err != nil {
-			log.Printf("[CPU %d] Failed to create dir %s: %v", cpuID, run.ResultDir, err)
+		// Use a sibling temp dir so the final rename is on the same filesystem
+		// (avoids cross-device link errors from os.Rename).
+		tmpDir, err := os.MkdirTemp(filepath.Dir(run.ResultDir), ".tmp-cryptopt-bench-*")
+		if err != nil {
+			log.Printf("[CPU %d] Failed to create temp dir for %s: %v", cpuID, id, err)
 			continue
 		}
 
+		// Point the run at the temp dir for the duration of the process.
+		tmpRun := run
+		tmpRun.ResultDir = tmpDir
+
 		cmdArgs := append(
 			[]string{"-c", strconv.Itoa(cpuID), "node", "./dist/CryptOpt.js"},
-			run.cliArgs()...,
+			tmpRun.cliArgs()...,
 		)
 		cmd := exec.Command("taskset", cmdArgs...)
 
@@ -219,12 +225,33 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 		if err := cmd.Run(); err != nil {
 			count := completed.Add(1)
 			log.Printf("[CPU %d] [%d/%d] Error running %s: %v", cpuID, count, total, id, err)
+			os.RemoveAll(tmpDir)
+			continue
+		}
+
+		// Process exited cleanly — atomically promote the temp dir to the final location.
+		// If the target already exists (e.g. a duplicate trial), append _1, _2, … until a free slot.
+		finalDir := run.ResultDir
+		renameFailed := false
+		for i := 1; ; i++ {
+			if err := os.Rename(tmpDir, finalDir); err == nil {
+				break
+			} else if _, statErr := os.Stat(finalDir); statErr != nil {
+				// Destination does not exist — some other unexpected error.
+				log.Printf("[CPU %d] Failed to move result dir to %s: %v", cpuID, run.ResultDir, err)
+				os.RemoveAll(tmpDir)
+				renameFailed = true
+				break
+			}
+			finalDir = fmt.Sprintf("%s_%d", run.ResultDir, i)
+		}
+		if renameFailed {
 			continue
 		}
 
 		count := completed.Add(1)
 		elapsed := time.Since(start).Round(time.Second)
-		fmt.Printf("[CPU %d] [%d/%d] Completed %s (took %s)\n", cpuID, count, total, id, elapsed)
+		fmt.Printf("[CPU %d] [%d/%d] Completed %s (took %s)\n", cpuID, count, total, filepath.Base(finalDir), elapsed)
 	}
 }
 
@@ -249,10 +276,6 @@ func main() {
 		*benchFile = path
 	}
 
-	if _, ok := os.LookupEnv("BENCHMARK_ALLOW_DUPLICATES"); ok {
-		*allowDuplicates = true
-	}
-
 	if val, ok := os.LookupEnv("BENCHMARK_NUM_WORKERS"); ok {
 		n, err := strconv.ParseUint(val, 10, 32)
 		if err != nil {
@@ -271,10 +294,6 @@ func main() {
 		log.Fatalf("Failed to parse benchmarks.yml: %v", err)
 	}
 
-	if *allowDuplicates {
-		fmt.Printf("Allowing duplicates\n")
-	}
-
 	bench, ok := benchmarks[benchName]
 	if !ok {
 		available := make([]string, 0, len(benchmarks))
@@ -288,11 +307,10 @@ func main() {
 	fields := getActiveFields(bench)
 	combos := crossProduct(fields)
 
-	if err := os.MkdirAll(*baseDir, 0755); err != nil {
-		log.Fatalf("Failed to create base directory: %v", err)
-	}
-
 	baseDir := path.Join(*baseDir, fmt.Sprintf("./results-%s", benchName))
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		log.Fatalf("Failed to create results directory: %v", err)
+	}
 	runs := make([]Run, len(combos))
 	for i, combo := range combos {
 		runs[i] = makeRun(combo, baseDir)

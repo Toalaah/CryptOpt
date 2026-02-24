@@ -139,7 +139,7 @@ export abstract class Optimizer {
       cycleCount: Infinity,
       ratio: 0,
     };
-    globals.currentRatio = 0;
+    globals.currentRatio = 1;
 
     this.no_of_instructions = -1;
     // load a saved state if necessary

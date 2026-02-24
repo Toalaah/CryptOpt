@@ -18,6 +18,7 @@ import { OptimizerArgs } from "@/types";
 import { SAOptimizer } from "@/optimizer/sa";
 import { RLSOptimizer } from "@/optimizer/rls";
 import { TabuOptimizer } from "@/optimizer/tabu";
+import { BiasedOptimizer } from "@/optimizer/biased";
 import { Optimizer } from "@/optimizer";
 
 export class OptimizerFactory {
@@ -29,6 +30,8 @@ export class OptimizerFactory {
         return new SAOptimizer(args);
       case "tabu":
         return new TabuOptimizer(args);
+      case "biased":
+        return new BiasedOptimizer(args);
       default:
         throw new Error(`unknown optimizer strategy: ${args.optimizer}`);
     }

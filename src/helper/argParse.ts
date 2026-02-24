@@ -40,6 +40,7 @@ import {
   SA_COOLING_SCHEDULE_EXP,
   SA_NEIGHBOR_STRATEGIES,
   SA_NEIGHBOR_STRATEGY_GREEDY,
+  OPTIMIZER_STRATEGY_BIASED,
 } from "@/types";
 
 const y = yargs(process.argv.slice(2));
@@ -77,6 +78,14 @@ export const parsedArgs = y
     describe: "Goal percentage of solutions which should be unique.",
   })
   // END TABU-specific args
+  // START BIASED-specific args
+  .option("biasedUcbFactor", {
+    number: true,
+    default: 0.25,
+    min: 0,
+    describe: `UCB1 exploration constant for the biased (multi-armed bandit) optimizer. Higher values favour exploration of the less-tried mutation type; lower values exploit the historically better-rewarded type. Has no effect if optimizer is not set to '${OPTIMIZER_STRATEGY_BIASED}'.`,
+  })
+  // END BIASED-specific args
   // START SA-specific args
   .option("saInitialTemperature", {
     number: true,

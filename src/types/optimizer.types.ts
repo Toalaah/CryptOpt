@@ -34,6 +34,9 @@ export type OptimizerArgs = {
   // START TABU-specific args
   tabuUniqueFactorGoal: number;
   // END TABU-specific args
+  // START BIASED-specific args
+  biasedUcbFactor: number;
+  // END BIASED-specific args
   // START SA-specific args
   saInitialTemperature: number;
   saAcceptParam: number;

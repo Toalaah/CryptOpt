@@ -56,6 +56,7 @@ type Benchmark struct {
 	SaCoolingSchedule    *Values `yaml:"saCoolingSchedule"`
 	SaReannealRatio      *Values `yaml:"saReannealRatio"`
 	TabuUniqueFactorGoal *Values `yaml:"tabuUniqueFactorGoal"`
+	BiasedUcbFactor      *Values `yaml:"biasedUcbFactor"`
 	Bets                 *Values `yaml:"bets"`
 	BetRatio             *Values `yaml:"betRatio"`
 	Cyclegoal            *Values `yaml:"cyclegoal"`
@@ -70,6 +71,7 @@ type Run struct {
 	SaNeighborStrategy   *string `flag:"saNeighborStrategy"`
 	SaInitialTemperature *string `flag:"saInitialTemperature"`
 	TabuUniqueFactorGoal *string `flag:"tabuUniqueFactorGoal"`
+	BiasedUcbFactor      *string `yaml:"biasedUcbFactor"`
 	SaVisitParam         *string `flag:"saVisitParam"`
 	SaAcceptParam        *string `flag:"saAcceptParam"`
 	SaStepSizeParam      *string `flag:"saStepSizeParam"`

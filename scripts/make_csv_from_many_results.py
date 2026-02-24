@@ -154,6 +154,8 @@ def make_row(run: tuple[Path, Path, Path], measure: bool = False) -> dict:
 
         d["tabu_unique_factor_goal"] = state["parsedArgs"]["tabuUniqueFactorGoal"]
 
+        d["biased_ucb_factor"] = state["parsedArgs"]["biasedUcbFactor"]
+
     if measure:
         asm_path = get_asm_file_from_state_file(state_path)
         median, stddev = remeasure(asm_path)

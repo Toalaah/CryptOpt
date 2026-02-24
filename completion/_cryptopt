@@ -32,6 +32,7 @@ _arguments -S -s \
     '--saVisitParam=[Visitng parameter factor for adjusting SA cooling schedule. Has no effect if optimizer strategy is NOT sa]:sa_visitpr:' \
     '--saMaxRejectStreakGoal=[Min length of reject streak after which to allow reannealing.]:sa_rejstreakgoal:' \
     '--tabuUniqueFactorGoal=[Goal percentage of unique solutions.]:tabu_uniquegoal:' \
+    '--biasedUcbFactor=[UCB1 exploration constant for the biased optimizer. Has no effect if optimizer is not biased]:biased_ucb_c:' \
     '(-c --curve -j --jsonFile -f --cFile)'{-c,--curve=}'[Curve]:curve:->curves' \
     '(-m --method -j --jsonFile -f --cFile)'{-m,--method=}'[Method]:method:->methods' \
     '(-j --jsonFile -c --curve -m --method)'{-j,--jsonFile=}'[JSON-CODE, must --bridge manual]:json:_files -g \*.json' \
@@ -69,6 +70,7 @@ case "$state" in
 			'rls[Random Local Search]' \
 			'sa[Simulated Annealing]' \
 			'tabu[Tabu Search]' \
+			'biased[Biased RLS with UCB1 adaptive mutation-type selection]' \
 		;;
 	methods)
 		_values  'method' \

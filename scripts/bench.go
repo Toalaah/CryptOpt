@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -220,15 +221,36 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 			tmpRun.cliArgs()...,
 		)
 		cmd := exec.Command("taskset", cmdArgs...)
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
+		// https://jarv.org/posts/command-with-timeout/
+		type cmdResult struct {
+			outb []byte
+			err  error
+		}
+
+		cmdDone := make(chan cmdResult, 1)
 		fmt.Printf("[CPU %d] %s: Running: %s\n", cpuID, time.Now().Format(time.DateTime), id)
 		start := time.Now()
+		go func() {
+			outb, err := cmd.CombinedOutput()
+			cmdDone <- cmdResult{outb, err}
+		}()
 
-		if err := cmd.Run(); err != nil {
+		select {
+		case <-time.After(90 * time.Minute):
+			syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 			count := completed.Add(1)
-			log.Printf("[CPU %d] [%d/%d] Error running %s: %v", cpuID, count, total, id, err)
+			log.Printf("[CPU %d] [%d/%d] timed out running %s", cpuID, count, total, id)
 			os.RemoveAll(tmpDir)
 			continue
+		case res := <-cmdDone:
+			if err := res.err; err != nil {
+				count := completed.Add(1)
+				log.Printf("[CPU %d] [%d/%d] Error running %s: %v", cpuID, count, total, id, err)
+				os.RemoveAll(tmpDir)
+				continue
+			}
 		}
 
 		// Process exited cleanly — atomically promote the temp dir to the final location.

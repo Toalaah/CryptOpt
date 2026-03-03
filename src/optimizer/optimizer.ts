@@ -72,8 +72,10 @@ export abstract class Optimizer {
   }
 
   protected addToSeen(asm: asm) {
+    const sBefore = this.asmHashes.size;
     this.asmHashes.add(createHash("md5").update(asm).digest("hex"));
     this.mutationStats.numUnique = this.asmHashes.size;
+    return sBefore < this.asmHashes.size;
   }
 
   protected handleMeasurementError(e: any): never {
@@ -128,7 +130,7 @@ export abstract class Optimizer {
 
     globals.convergence = [];
     globals.mutationLog = [
-      "epoch,evaluation,nPerm,nDesc,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall,ratio",
+      "epoch,evaluation,nPerm,nDesc,choice,kept,newCandidate,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall,ratio",
     ];
     globals.bestEpochByRatio = { ratio: 0, epoch: 0, nEvals: 0, cycleCount: 0 };
     globals.bestEpochByCycle = {

@@ -139,11 +139,11 @@ export class TabuOptimizer extends Optimizer {
         this.mutate({ updateStats: false });
         asm = assemble(slot);
       }
-      this.addToSeen(asm);
+      const wasNew = this.addToSeen(asm);
       Model.saveSnaphot(slot.toString());
       const perm = this.choice == CHOICE.PERMUTE ? 1 : 0;
       const desc = 1 - perm;
-      return { perm, desc };
+      return { perm, desc, wasNew };
     };
 
     return new Promise<OptimizerResult>((resolve) => {
@@ -165,10 +165,12 @@ export class TabuOptimizer extends Optimizer {
       }
 
       const intervalHandle = setInterval(() => {
+        let wasNewCandidate = false;
         // Mutation & candidate generation.
         {
           Model.saveSnaphot("current");
-          const { perm, desc } = sampleNeighbor(CANDIDATE_FUNCTION);
+          const { perm, desc, wasNew } = sampleNeighbor(CANDIDATE_FUNCTION);
+          wasNewCandidate = wasNew;
           candidates[CANDIDATE_FUNCTION].mutStats.numPerm = perm;
           candidates[CANDIDATE_FUNCTION].mutStats.numDecision = desc;
           this.mutationStats.numMut.permutation += perm;
@@ -290,6 +292,7 @@ export class TabuOptimizer extends Optimizer {
           logMutation({
             choice: this.choice,
             kept,
+            wasNewCandidate,
             numEvals: numEvals,
             epoch: numEvals,
             nDesc: candidates[CANDIDATE_FUNCTION].mutStats.numDecision,

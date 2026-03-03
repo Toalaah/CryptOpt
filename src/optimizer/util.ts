@@ -121,6 +121,7 @@ export function genStatistics(a: {
 export function logMutation({
   choice,
   kept,
+  wasNewCandidate,
   epoch,
   numEvals,
   nPerm,
@@ -131,6 +132,7 @@ export function logMutation({
   epoch: number;
   numEvals: number;
   kept: boolean;
+  wasNewCandidate: boolean;
   nPerm?: number;
   nDesc?: number;
   ratio: number;
@@ -149,6 +151,7 @@ export function logMutation({
       numDecisionInThisMutation,
       choice.trim(),
       kept ? 1 : 0,
+      wasNewCandidate ? 1 : 0,
       pDetails,
       dDetails,
       ratio,

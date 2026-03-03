@@ -56,11 +56,7 @@ const hasExecutable = (bin: string) => {
 };
 
 // Build scripts & measurement tools.
-for (const script of [
-  "./scripts/GraphMutatedVariants.ts",
-  "./scripts/TestEquivalence.ts",
-  "./scripts/bench.go",
-]) {
+for (const script of ["./scripts/TestEquivalence.ts", "./scripts/bench.go"]) {
   const toolName = path.basename(path.basename(script, ".ts"), ".go");
   if (script.endsWith(".go")) {
     if (!hasExecutable("go")) continue;

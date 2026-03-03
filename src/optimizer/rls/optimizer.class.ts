@@ -72,6 +72,7 @@ export class RLSOptimizer extends Optimizer {
 
       const intervalHandle = setInterval(() => {
         const currentEpoch = numEvals;
+        let wasNewCandidate = false;
         if (numEvals > 0) {
           // not first eval, thus we want to mutate.
           this.mutate();
@@ -88,11 +89,11 @@ export class RLSOptimizer extends Optimizer {
         if (this.args.verbose) {
           const c = code.join("\n");
           writeString(pathResolve(this.libcheckfunctionDirectory, "current.asm"), c);
-          this.addToSeen(c);
+          wasNewCandidate = this.addToSeen(c);
           this.asmStrings[currentNameOfTheFunctionThatHasTheMutation] = c;
         } else {
           const c = filteredInstructions.join("\n");
-          this.addToSeen(c);
+          wasNewCandidate = this.addToSeen(c);
           this.asmStrings[currentNameOfTheFunctionThatHasTheMutation] = c;
         }
 
@@ -254,7 +255,7 @@ export class RLSOptimizer extends Optimizer {
           }
 
           const choice = this.choice;
-          logMutation({ choice, kept, numEvals, epoch: currentEpoch, ratio: currentRatio });
+          logMutation({ choice, kept, wasNewCandidate, numEvals, epoch: currentEpoch, ratio: currentRatio });
           if (numEvals % PRINT_EVERY == 0) {
             // print every 10th eval
             // a line every 5% (also to logfile) also write the asm when

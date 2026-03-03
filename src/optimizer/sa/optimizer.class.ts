@@ -260,16 +260,17 @@ export class SAOptimizer extends Optimizer {
             return filteredInstructions.join("\n");
         }
       })();
-      this.addToSeen(asm);
       candidates[slot].asm = asm;
       candidates[slot].stacklength = assembleResult.stacklength;
       candidates[slot].ninst = filteredInstructions.length;
+      return this.addToSeen(asm);
     };
 
     return new Promise<OptimizerResult>((resolve) => {
       FileLogger.log("starting sa optimisation");
       const optimistaionStartDate = Date.now();
       let time = Date.now();
+      let wasNewCandidate = false;
       printStartInfo({
         ...this.args,
         symbolname: this.symbolname,
@@ -306,7 +307,7 @@ export class SAOptimizer extends Optimizer {
             candidates[i].mutStats.numPerm = perm;
             candidates[i].mutStats.numDecision = decision;
             candidates[i].choice = this.choice;
-            assemble(i);
+            wasNewCandidate = assemble(i);
             numEvals++;
             Model.restoreSnapshot("current");
           }
@@ -440,6 +441,7 @@ export class SAOptimizer extends Optimizer {
           logMutation({
             choice: this.choice,
             kept,
+            wasNewCandidate,
             numEvals: numEvals,
             epoch: currentEpoch,
             nDesc: candidates[neighborIdx].mutStats.numDecision,

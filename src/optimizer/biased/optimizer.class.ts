@@ -110,6 +110,7 @@ export class BiasedOptimizer extends Optimizer {
 
       const intervalHandle = setInterval(() => {
         const currentEpoch = numEvals;
+        let wasNewCandidate = false;
 
         if (numEvals > 0) {
           // Select arm via UCB1, then mutate.
@@ -127,11 +128,11 @@ export class BiasedOptimizer extends Optimizer {
         if (this.args.verbose) {
           const c = code.join("\n");
           writeString(pathResolve(this.libcheckfunctionDirectory, "current.asm"), c);
-          this.addToSeen(c);
+          wasNewCandidate = this.addToSeen(c);
           this.asmStrings[currentNameOfTheFunctionThatHasTheMutation] = c;
         } else {
           const c = filteredInstructions.join("\n");
-          this.addToSeen(c);
+          wasNewCandidate = this.addToSeen(c);
           this.asmStrings[currentNameOfTheFunctionThatHasTheMutation] = c;
         }
 
@@ -270,7 +271,7 @@ export class BiasedOptimizer extends Optimizer {
           }
 
           const choice = this.choice;
-          logMutation({ choice, kept, numEvals, epoch: currentEpoch, ratio: currentRatio });
+          logMutation({ choice, kept, wasNewCandidate, numEvals, epoch: currentEpoch, ratio: currentRatio });
 
           if (numEvals % PRINT_EVERY == 0) {
             const writeout = numEvals % (this.args.evals / LOG_EVERY) === 0;

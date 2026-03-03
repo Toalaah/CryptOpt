@@ -27,6 +27,7 @@ var (
 	benchFile  = flag.String("f", "./scripts/benchmarks.yml", "path to the benchmark YAML file (env: $BENCHMARK_CONFIG)")
 	numWorkers = flag.Int("j", runtime.NumCPU(), "number of parallel jobs (CPUs to use) (env: $BENCHMARK_NUM_WORKERS)")
 	baseDir    = flag.String("b", ".", "relative path to where results should be stored (env: $BENCHMARK_BASE_DIR)")
+	timeout    = flag.Duration("t", 90*time.Minute, "relative path to where results should be stored (env: $BENCHMARK_TIMEOUT)")
 )
 
 type Values []string
@@ -238,7 +239,7 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 		}()
 
 		select {
-		case <-time.After(90 * time.Minute):
+		case <-time.After(*timeout):
 			syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 			count := completed.Add(1)
 			log.Printf("[CPU %d] [%d/%d] timed out running %s", cpuID, count, total, id)
@@ -298,6 +299,14 @@ func main() {
 
 	if path, ok := os.LookupEnv("BENCHMARK_CONFIG"); ok {
 		*benchFile = path
+	}
+
+	if t, ok := os.LookupEnv("BENCHMARK_TIMEOUT"); ok {
+		d, err := time.ParseDuration(t)
+		if err != nil {
+			log.Fatalf("Failed to parse timeout from env: %v", err)
+		}
+		*timeout = d
 	}
 
 	if val, ok := os.LookupEnv("BENCHMARK_NUM_WORKERS"); ok {

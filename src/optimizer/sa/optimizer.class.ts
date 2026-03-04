@@ -197,11 +197,11 @@ export class SAOptimizer extends Optimizer {
 
     // const shouldReanneal = () => currentRejectStreak >= this.maxNoImproveStreak;
     const shouldReanneal = () => {
-      if (numAccepted > 200) {
-        numAccepted = 0;
-        return true;
-      }
-      if (numRejected > 100) {
+      // if (numAccepted > 200) {
+      //   numAccepted = 0;
+      //   return true;
+      // }
+      if (currentRejectStreak > this.maxNoImproveStreak) {
         numRejected = 0;
         return true;
       }

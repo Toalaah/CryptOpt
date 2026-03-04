@@ -120,7 +120,7 @@ export const parsedArgs = y
   })
   .option("saStepSizeParam", {
     number: true,
-    default: 0.0002,
+    default: 0.002,
     describe: "Step size parameter value (has no effect if optimizer is not set to 'sa').",
   })
   .option("saMutStepSizeLoc", {

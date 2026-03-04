@@ -114,7 +114,7 @@ for grp, runs in grouped:
             "ratio_sa": ratio_sa,
             "ratio_improvement": percentage_improvement(ratio_rls, ratio_sa),
             "best_ratio_improvement": percentage_improvement(
-                rls_run["best_batio"], sa_run["best_ratio"]
+                rls_run["best_ratio"], sa_run["best_ratio"]
             ),
             "cycle_improvement": percentage_improvement(
                 rls_run["cycle"], sa_run["cycle"]

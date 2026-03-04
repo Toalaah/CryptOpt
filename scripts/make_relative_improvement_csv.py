@@ -27,7 +27,7 @@ def run_ms(sa: Path, rls: Path, n: int = 3):
     cycles_rls = []
     for _ in range(n):
         output = subprocess.check_output(
-            ["ms", rls.as_posix(), sa.as_posix(), "-n", "100", "-c"]
+            ["ms", sa.as_posix(), rls.as_posix(), "-n", "100", "-c"]
         )
         data = json.loads(output)
         cycles_sa.extend(data["cycles"][0])
@@ -103,8 +103,7 @@ for grp, runs in grouped:
     assert rls_run["optimizer"] == "rls" and sa_run["optimizer"] == "sa"
     ratio_rls, ratio_sa = rls_run["ratio"], sa_run["ratio"]
     evals, curve, method = grp
-    cycles_sa, cycles_rls = run_ms(rls_run["asm_file"], sa_run["asm_file"])
-    percentage_improvement(statistics.median(cycles_rls), statistics.median(cycles_sa))
+    cycles_sa, cycles_rls = run_ms(sa_run["asm_file"], rls_run["asm_file"])
     data.append(
         {
             "evals": evals,
@@ -112,15 +111,17 @@ for grp, runs in grouped:
             "method": method,
             "ratio_rls": ratio_rls,
             "ratio_sa": ratio_sa,
-            "ratio_improvement": percentage_improvement(ratio_rls, ratio_sa),
+            "ratio_improvement": percentage_improvement(ratio_sa, ratio_rls),
             "best_ratio_improvement": percentage_improvement(
-                rls_run["best_ratio"], sa_run["best_ratio"]
+                sa_run["best_ratio"],
+                rls_run["best_ratio"],
             ),
             "cycle_improvement": percentage_improvement(
-                rls_run["cycle"], sa_run["cycle"]
+                sa_run["cycle"], rls_run["cycle"]
             ),
             "best_cycle_improvement": percentage_improvement(
-                rls_run["best_cycle"], sa_run["best_cycle"]
+                sa_run["best_cycle"],
+                rls_run["best_cycle"],
             ),
             "cycles_rls": rls_run["cycle"],
             "cycles_sa": sa_run["cycle"],
@@ -128,14 +129,16 @@ for grp, runs in grouped:
             "cycles_rls_validate": statistics.mean(cycles_rls),
             "cycles_sa_validate": statistics.mean(cycles_sa),
             "mean_relative_improvement_validate": percentage_improvement(
-                statistics.mean(cycles_rls), statistics.mean(cycles_sa)
+                statistics.mean(cycles_sa),
+                statistics.mean(cycles_rls),
             ),
             "geo_mean_relative_improvement_validate": percentage_improvement(
-                statistics.geometric_mean(cycles_rls),
                 statistics.geometric_mean(cycles_sa),
+                statistics.geometric_mean(cycles_rls),
             ),
             "median_relative_improvement_validate": percentage_improvement(
-                statistics.median(cycles_rls), statistics.median(cycles_sa)
+                statistics.median(cycles_sa),
+                statistics.median(cycles_rls),
             ),
         }
     )

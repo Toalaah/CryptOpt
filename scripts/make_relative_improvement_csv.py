@@ -35,7 +35,7 @@ def run_ms(sa: Path, rls: Path, n: int = 3):
     return cycles_sa, cycles_rls
 
 
-def get_run_data(run: Path):
+def get_run_data(summary: Path):
     @dataclass
     class Data:
         state_file: Path
@@ -45,18 +45,41 @@ def get_run_data(run: Path):
         optimizer: Literal["rls", "sa"]
         symbol: str
         evals: int
+        ratio: float
+        best_ratio: float
+        best_cycle: float
+        cycle: float
+
+    run = Path(str(summary).removesuffix("".join(summary.suffixes))).with_suffix(
+        ".json"
+    )
+
+    best_ratio = 0.0
+    best_cycle = 0.0
+    cycle = 0.0
+
+    with open(summary, "r") as f:
+        d = json.load(f)
+        best_ratio = d["bestEpochByRatio"]["ratio"]
+        best_cycle = d["bestEpochByCycle"]["cycleCount"]
+        cycle = d["cycleCount"]
 
     with open(run, "r") as f:
-        data = json.load(f)
-        return Data(
+        d = json.load(f)
+        data = Data(
             state_file=run,
             asm_file=get_asm_file_from_state_file(run),
-            curve=data["parsedArgs"]["curve"],
-            method=data["parsedArgs"]["method"],
-            symbol=data["parsedArgs"]["symbolname"],
-            optimizer=data["parsedArgs"]["optimizer"],
-            evals=data["parsedArgs"]["evals"],
+            curve=d["parsedArgs"]["curve"],
+            method=d["parsedArgs"]["method"],
+            symbol=d["parsedArgs"]["symbolname"],
+            optimizer=d["parsedArgs"]["optimizer"],
+            evals=d["parsedArgs"]["evals"],
+            ratio=d["ratio"],
+            best_ratio=best_ratio,
+            best_cycle=best_cycle,
+            cycle=cycle,
         )
+    return data
 
 
 if len(sys.argv) < 2:
@@ -66,9 +89,7 @@ if len(sys.argv) < 2:
 res_dir = sys.argv[1]
 results_dir = Path(res_dir)
 runs = map(
-    lambda r: get_run_data(
-        Path(str(r).removesuffix("".join(r.suffixes))).with_suffix(".json")
-    ),
+    lambda r: get_run_data(r),
     results_dir.rglob("**/*.summary.json"),
 )
 
@@ -80,6 +101,7 @@ for grp, runs in grouped:
     assert len(runs) == 2
     rls_run, sa_run = runs.iloc[0], runs.iloc[1]
     assert rls_run["optimizer"] == "rls" and sa_run["optimizer"] == "sa"
+    ratio_rls, ratio_sa = rls_run["ratio"], sa_run["ratio"]
     evals, curve, method = grp
     cycles_sa, cycles_rls = run_ms(rls_run["asm_file"], sa_run["asm_file"])
     percentage_improvement(statistics.median(cycles_rls), statistics.median(cycles_sa))
@@ -88,19 +110,34 @@ for grp, runs in grouped:
             "evals": evals,
             "curve": curve,
             "method": method,
-            "cycles_rls": statistics.mean(cycles_rls),
-            "cycles_sa": statistics.mean(cycles_sa),
-            "mean_relative_improvement": percentage_improvement(
+            "ratio_rls": ratio_rls,
+            "ratio_sa": ratio_sa,
+            "ratio_improvement": percentage_improvement(ratio_rls, ratio_sa),
+            "best_ratio_improvement": percentage_improvement(
+                rls_run["best_batio"], sa_run["best_ratio"]
+            ),
+            "cycle_improvement": percentage_improvement(
+                rls_run["cycle"], sa_run["cycle"]
+            ),
+            "best_cycle_improvement": percentage_improvement(
+                rls_run["best_cycle"], sa_run["best_cycle"]
+            ),
+            "cycles_rls": rls_run["cycle"],
+            "cycles_sa": sa_run["cycle"],
+            # Validation stats.
+            "cycles_rls_validate": statistics.mean(cycles_rls),
+            "cycles_sa_validate": statistics.mean(cycles_sa),
+            "mean_relative_improvement_validate": percentage_improvement(
                 statistics.mean(cycles_rls), statistics.mean(cycles_sa)
             ),
-            "geo_mean_relative_improvement": percentage_improvement(
+            "geo_mean_relative_improvement_validate": percentage_improvement(
                 statistics.geometric_mean(cycles_rls),
                 statistics.geometric_mean(cycles_sa),
             ),
-            "median_relative_improvement": percentage_improvement(
+            "median_relative_improvement_validate": percentage_improvement(
                 statistics.median(cycles_rls), statistics.median(cycles_sa)
             ),
         }
     )
 
-pd.DataFrame(data).to_csv("out.csv", index=False)
+pd.DataFrame(data).to_csv("compare-rls-sa.csv", index=False)

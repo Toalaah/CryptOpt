@@ -46,6 +46,7 @@ func (v *Values) UnmarshalYAML(node *yaml.Node) error {
 type Benchmark struct {
 	Optimizer            *Values `yaml:"optimizer"`
 	Method               *Values `yaml:"method"`
+	Single               *Values `yaml:"single"`
 	Curve                *Values `yaml:"curve"`
 	Evals                *Values `yaml:"evals"`
 	SaNumNeighbors       *Values `yaml:"saNumNeighbors"`
@@ -82,6 +83,7 @@ type Run struct {
 	SaReannealRatio      *string `flag:"saReannealRatio"`
 	Bets                 *string `flag:"bets"`
 	BetRatio             *string `flag:"betRatio"`
+	Single               *string `flag:"single"`
 	Cyclegoal            *string `flag:"cyclegoal"`
 	ResultDir            string  `flag:"-"`
 }

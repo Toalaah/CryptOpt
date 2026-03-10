@@ -68,14 +68,14 @@ export abstract class Optimizer {
 
   protected isNew(asm: asm) {
     const hash = createHash("md5").update(asm).digest("hex");
-    return !this.asmHashes.has(hash);
+    return { hash: hash, isNew: !this.asmHashes.has(hash) };
   }
 
   protected addToSeen(asm: asm) {
-    const sBefore = this.asmHashes.size;
-    this.asmHashes.add(createHash("md5").update(asm).digest("hex"));
+    const { hash, isNew } = this.isNew(asm);
+    this.asmHashes.add(hash);
     this.mutationStats.numUnique = this.asmHashes.size;
-    return sBefore < this.asmHashes.size;
+    return isNew;
   }
 
   protected handleMeasurementError(e: any): never {

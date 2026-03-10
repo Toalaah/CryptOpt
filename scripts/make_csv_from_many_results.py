@@ -151,6 +151,7 @@ def make_row(run: tuple[Path, Path, Path], measure: bool = False) -> dict:
         d["sa_cooling_schedule"] = state["parsedArgs"]["saCoolingSchedule"]
         d["sa_reanneal_ratio"] = state["parsedArgs"]["saReannealRatio"]
         d["sa_reanneal_frequency"] = state["parsedArgs"]["saReannealFrequency"]
+        d["sa_reanneal_after"] = state["parsedArgs"]["saMaxRejectStreakGoal"]
 
         d["tabu_unique_factor_goal"] = state["parsedArgs"]["tabuUniqueFactorGoal"]
 

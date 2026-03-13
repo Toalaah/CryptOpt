@@ -64,6 +64,7 @@ type Benchmark struct {
 	Bets                  *Values `yaml:"bets"`
 	BetRatio              *Values `yaml:"betRatio"`
 	Cyclegoal             *Values `yaml:"cyclegoal"`
+	NoProof               *Values `yaml:"noProof"`
 }
 
 type Run struct {
@@ -88,6 +89,7 @@ type Run struct {
 	Single                *string `flag:"single"`
 	Cyclegoal             *string `flag:"cyclegoal"`
 	ResultDir             string  `flag:"-"`
+	NoProof               *Values `yaml:"noProof"`
 }
 
 type paramField struct {
@@ -131,8 +133,13 @@ func crossProduct(fields []paramField) []map[string]string {
 
 func makeRunID(params map[string]string) string {
 	standardOrder := []string{"optimizer", "curve", "method"}
+	ignore := []string{"noProof"}
 	var parts []string
 	used := make(map[string]bool)
+
+	for _, key := range ignore {
+		used[key] = true
+	}
 
 	for _, key := range standardOrder {
 		if v, ok := params[key]; ok {

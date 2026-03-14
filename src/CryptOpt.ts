@@ -36,7 +36,7 @@ import { registerExitHooks } from "@/helper/process";
 import { Model } from "@/model";
 import { OptimizerFactory, Optimizer, OptimizerResult, MutationStats } from "@/optimizer";
 import { sha1Hash } from "@/paul";
-import type { CryptOpt, CryptoptGlobals, ParsedArgsT } from "@/types";
+import { OPTIMIZER_STRATEGY_RLS, CryptOpt, type CryptoptGlobals, type ParsedArgsT } from "@/types";
 
 import { Logger, FileLogger } from "./helper/Logger.class";
 import globals from "./helper/globals";
@@ -124,8 +124,9 @@ async function allBets(evals: number, bets: number): Promise<RunResult[]> {
       ...parsedArgs,
       evals,
       logComment: `${parsedArgs.logComment} ${i}/${bets}`,
+      optimizer: "rls",
       seed: derivedSeed,
-    };
+    } as ParsedArgsT;
     Logger.log("running a bet with " + JSON.stringify(args, undefined, 2));
     const runResult = await run(args);
     runRes.push(runResult);

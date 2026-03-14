@@ -28,6 +28,7 @@ var (
 	numWorkers = flag.Int("j", runtime.NumCPU(), "number of parallel jobs (CPUs to use) (env: $BENCHMARK_NUM_WORKERS)")
 	baseDir    = flag.String("b", ".", "relative path to where results should be stored (env: $BENCHMARK_BASE_DIR)")
 	timeout    = flag.Duration("t", 90*time.Minute, "relative path to where results should be stored (env: $BENCHMARK_TIMEOUT)")
+	proof      = flag.Bool("p", true, "whether to enable/disable proofs of final assembly (env: $BENCHMARK_PROOF)")
 )
 
 type Values []string
@@ -64,7 +65,6 @@ type Benchmark struct {
 	Bets                  *Values `yaml:"bets"`
 	BetRatio              *Values `yaml:"betRatio"`
 	Cyclegoal             *Values `yaml:"cyclegoal"`
-	NoProof               *Values `yaml:"noProof"`
 }
 
 type Run struct {
@@ -89,7 +89,6 @@ type Run struct {
 	Single                *string `flag:"single"`
 	Cyclegoal             *string `flag:"cyclegoal"`
 	ResultDir             string  `flag:"-"`
-	NoProof               *Values `yaml:"noProof"`
 }
 
 type paramField struct {
@@ -198,8 +197,11 @@ func (r Run) cliArgs() []string {
 		}
 		args = append(args, "--"+tag, field.Elem().String())
 	}
-	if r.Optimizer != nil && *r.Optimizer == "sa" {
-		args = append(args, "--single")
+	// if r.Optimizer != nil && *r.Optimizer == "sa" {
+	// 	args = append(args, "--single")
+	// }
+	if !*proof {
+		args = append(args, "--noProof")
 	}
 	args = append(args, "--resultDir", r.ResultDir)
 	return args
@@ -320,6 +322,14 @@ func main() {
 		*timeout = d
 	}
 
+	if p, ok := os.LookupEnv("BENCHMARK_PROOF"); ok {
+		b, err := strconv.ParseBool(p)
+		if err != nil {
+			log.Fatalf("Failed to parse bool from env: %v", err)
+		}
+		*proof = b
+	}
+
 	if val, ok := os.LookupEnv("BENCHMARK_NUM_WORKERS"); ok {
 		n, err := strconv.ParseUint(val, 10, 32)
 		if err != nil {
@@ -351,13 +361,13 @@ func main() {
 	fields := getActiveFields(bench)
 	combos := crossProduct(fields)
 
-	baseDir := path.Join(*baseDir, fmt.Sprintf("./results-%s", benchName))
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
+	*baseDir = path.Join(*baseDir, fmt.Sprintf("./results-%s", benchName))
+	if err := os.MkdirAll(*baseDir, 0755); err != nil {
 		log.Fatalf("Failed to create results directory: %v", err)
 	}
 	runs := make([]Run, len(combos))
 	for i, combo := range combos {
-		runs[i] = makeRun(combo, baseDir)
+		runs[i] = makeRun(combo, *baseDir)
 	}
 
 	rand.Shuffle(len(runs), func(i, j int) {
@@ -367,6 +377,10 @@ func main() {
 	fmt.Printf("Benchmark: %s\n", benchName)
 	fmt.Printf("Total runs: %d\n", len(runs))
 	fmt.Printf("Workers: %d (CPUs 0-%d)\n", *numWorkers, *numWorkers-1)
+	fmt.Printf("Base dir: %s\n", *baseDir)
+	fmt.Printf("Using config: %s\n", *benchFile)
+	fmt.Printf("Proof-checking: %t\n", *proof)
+
 	fmt.Println()
 
 	jobs := make(chan Run)
@@ -380,7 +394,7 @@ func main() {
 
 	for _, run := range runs {
 		jobs <- run
-		time.Sleep(time.Millisecond * 250)
+		time.Sleep(time.Millisecond * 100)
 	}
 	close(jobs)
 

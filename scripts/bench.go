@@ -132,7 +132,7 @@ func crossProduct(fields []paramField) []map[string]string {
 
 func makeRunID(params map[string]string) string {
 	standardOrder := []string{"optimizer", "curve", "method"}
-	ignore := []string{"noProof"}
+	ignore := []string{"no-proof"}
 	var parts []string
 	used := make(map[string]bool)
 
@@ -201,7 +201,7 @@ func (r Run) cliArgs() []string {
 	// 	args = append(args, "--single")
 	// }
 	if !*proof {
-		args = append(args, "--noProof")
+		args = append(args, "--no-proof")
 	}
 	args = append(args, "--resultDir", r.ResultDir)
 	return args

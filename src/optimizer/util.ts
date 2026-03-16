@@ -126,6 +126,7 @@ export function logMutation({
   numEvals,
   nPerm,
   nDesc,
+  temp,
   ratio,
 }: {
   choice: CHOICE;
@@ -135,6 +136,7 @@ export function logMutation({
   wasNewCandidate: boolean;
   nPerm?: number;
   nDesc?: number;
+  temp?: number;
   ratio: number;
 }): void {
   const pDetails = choice == " P" ? Model.permutationStats : "                      ";
@@ -142,6 +144,7 @@ export function logMutation({
 
   const numPermutationsInThisMutation = nPerm ?? (choice == CHOICE.PERMUTE ? 1 : 0);
   const numDecisionInThisMutation = nDesc ?? (choice == CHOICE.DECISION ? 1 : 0);
+  const temperature = temp ?? 0;
 
   globals.mutationLog.push(
     [
@@ -154,6 +157,7 @@ export function logMutation({
       wasNewCandidate ? 1 : 0,
       pDetails,
       dDetails,
+      temperature,
       ratio,
     ].join(","),
   );

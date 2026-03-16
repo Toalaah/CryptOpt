@@ -172,7 +172,7 @@ export class SAOptimizer extends Optimizer {
     let currentEpoch = 0;
     // const reannealThresh = this.initialTemperature * this.reAnnealRatio;
     let annealingIndex = 0; // Separate tracking of annealing step as we may reset it when re-annealing, thus breaking the prior invariant of epoch == annealingIndex.
-    let xBest: State = { asm: "", ratio: -1, cycleCount: -1 }; // Add slot for storing the best result we see.
+    let xBest: State = { asm: "", ratio: 0, cycleCount: 0 }; // Add slot for storing the best result we see.
     let temperature = 0;
     let showPerSecond = "many/s";
     let perSecondCounter = 0;
@@ -183,6 +183,7 @@ export class SAOptimizer extends Optimizer {
     // Used to track how when we should reanneal.
     let numAccepted = 0;
     let numRejected = 0;
+    let currentAnnealingCycleStartRatio = 0;
     // Various helpers used in main optimization loop below.
 
     /**
@@ -197,16 +198,12 @@ export class SAOptimizer extends Optimizer {
 
     // const shouldReanneal = () => currentRejectStreak >= this.maxNoImproveStreak;
     const shouldReanneal = () => {
-      // if (numAccepted > 200) {
-      //   numAccepted = 0;
-      //   return true;
-      // }
-      if (currentRejectStreak > this.maxNoImproveStreak) {
-        numRejected = 0;
-        return true;
-      }
-      return false;
-      // return temperature < reannealThresh || currentRejectStreak >= this.maxNoImproveStreak;
+      const total = numAccepted + numRejected;
+      if (total < 200) return false;
+      if (numRejected > 150) return true;
+      const percentageImprovement =
+        (globals.currentRatio - currentAnnealingCycleStartRatio) / currentAnnealingCycleStartRatio;
+      return percentageImprovement <= 0.05;
     };
 
     /**
@@ -214,7 +211,7 @@ export class SAOptimizer extends Optimizer {
      */
     const updateBest = (state: State) => {
       // Could also filter by raw cycle count here, may have to experiment with what actually delivers better results.
-      if (state.cycleCount >= xBest.cycleCount && xBest.cycleCount > 0) return false;
+      if (state.ratio < xBest.ratio && xBest.ratio > 0) return false;
       xBest.asm = state.asm;
       xBest.ratio = state.ratio;
       xBest.cycleCount = state.cycleCount;
@@ -289,13 +286,6 @@ export class SAOptimizer extends Optimizer {
         temperature = this.coolingSchedule(annealingIndex);
         if (temperature <= 0) errorOut({ exitCode: 123, msg: "temperature <= 0" });
         FileLogger.log(`epoch ${currentEpoch}, temp=${temperature}`);
-
-        // Determine whether to re-anneal.
-        if (shouldReanneal()) {
-          FileLogger.log(`reannealing`);
-          annealingIndex = 0;
-          temperature = this.coolingSchedule(annealingIndex);
-        }
 
         // Mutation & candidate generation.
         {
@@ -409,6 +399,7 @@ export class SAOptimizer extends Optimizer {
           const currentRatio = meanrawCheck / minRaw;
           const currentCycleCount = analyseResult.batchSizeScaledrawMedian[indexGood];
           globals.currentRatio = currentRatio;
+          if (currentAnnealingCycleStartRatio === 0) currentAnnealingCycleStartRatio = currentRatio;
 
           // Update globals w.r.t best ratios/cycle counts.
           {
@@ -446,6 +437,7 @@ export class SAOptimizer extends Optimizer {
             epoch: currentEpoch,
             nDesc: candidates[neighborIdx].mutStats.numDecision,
             nPerm: candidates[neighborIdx].mutStats.numPerm,
+            temp: temperature,
             ratio: currentRatio,
           });
 
@@ -476,6 +468,15 @@ export class SAOptimizer extends Optimizer {
 
         currentEpoch++;
         annealingIndex++;
+
+        // Determine whether to re-anneal.
+        if (shouldReanneal()) {
+          FileLogger.log(`reannealing`);
+          annealingIndex = 0;
+          numAccepted = 0;
+          numRejected = 0;
+          currentAnnealingCycleStartRatio = globals.currentRatio;
+        }
 
         // Start cleanup
         {

@@ -180,7 +180,7 @@ export class SAOptimizer extends Optimizer {
     let currentAcceptStreak = 0;
     let currentRejectStreak = 0;
 
-    // Used to track how when we should reanneal.
+    // Used to track how/when we should reanneal.
     let numAccepted = 0;
     let numRejected = 0;
     let currentAnnealingCycleStartRatio = 0;
@@ -198,12 +198,12 @@ export class SAOptimizer extends Optimizer {
 
     // const shouldReanneal = () => currentRejectStreak >= this.maxNoImproveStreak;
     const shouldReanneal = () => {
-      const total = numAccepted + numRejected;
-      if (total < 200) return false;
-      if (numRejected > 150) return true;
-      const percentageImprovement =
-        (globals.currentRatio - currentAnnealingCycleStartRatio) / currentAnnealingCycleStartRatio;
-      return percentageImprovement <= 0.05;
+      // const total = numAccepted + numRejected;
+      // if (total < 500) return false;
+      return numRejected >= this.maxNoImproveStreak;
+      // const percentageImprovement =
+      //   (globals.currentRatio - currentAnnealingCycleStartRatio) / currentAnnealingCycleStartRatio;
+      // return percentageImprovement <= 0.05;
     };
 
     /**

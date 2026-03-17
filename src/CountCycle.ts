@@ -46,7 +46,7 @@ import { init } from "@/optimizer/helpers";
 import { sha1Hash } from "@/paul";
 
 // this number specifies how many data points are in each sample.
-const MAX_SAMLPESIZE = 10;
+const MAX_SAMPLESIZE = 10;
 const NUMBER_OF_BATCHES = 31; // nob in the paper
 const BATCH_SIZE = 400; // bs in the paper
 
@@ -90,13 +90,13 @@ function main() {
     let result = "";
     if (asmString == null) {
       // do it twice the size
-      const data = doSampleLibonly(ms, 2 * MAX_SAMLPESIZE);
+      const data = doSampleLibonly(ms, 2 * MAX_SAMPLESIZE);
       const checkMean = roboustMean(data);
       if (checkMean !== -1) {
         result = checkMean.toString();
       }
     } else {
-      const { asm, check } = doSampleAsm(ms, MAX_SAMLPESIZE, asmString, param_one);
+      const { asm, check } = doSampleAsm(ms, MAX_SAMPLESIZE, asmString, param_one);
       const checkMean = roboustMean(check);
       const asmMean = roboustMean(asm);
       if (checkMean !== -1 && asmMean !== -1) {

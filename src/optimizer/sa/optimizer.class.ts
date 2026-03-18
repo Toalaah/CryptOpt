@@ -200,10 +200,11 @@ export class SAOptimizer extends Optimizer {
     const shouldReanneal = () => {
       // const total = numAccepted + numRejected;
       // if (total < 500) return false;
-      return numRejected >= this.maxNoImproveStreak;
+      if (numRejected < this.maxNoImproveStreak) return false;
+      return globals.currentRatio < currentAnnealingCycleStartRatio;
       // const percentageImprovement =
       //   (globals.currentRatio - currentAnnealingCycleStartRatio) / currentAnnealingCycleStartRatio;
-      // return percentageImprovement <= 0.05;
+      // return percentageImprovement <= 0.02;
     };
 
     /**
@@ -399,7 +400,7 @@ export class SAOptimizer extends Optimizer {
           const currentRatio = meanrawCheck / minRaw;
           const currentCycleCount = analyseResult.batchSizeScaledrawMedian[indexGood];
           globals.currentRatio = currentRatio;
-          if (currentAnnealingCycleStartRatio === 0) currentAnnealingCycleStartRatio = currentRatio;
+          if (currentAnnealingCycleStartRatio == 0) currentAnnealingCycleStartRatio = currentRatio;
 
           // Update globals w.r.t best ratios/cycle counts.
           {

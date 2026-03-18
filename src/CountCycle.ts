@@ -85,6 +85,7 @@ function main() {
   }
   const cacheDir = createCache();
   const ms = createMS(cacheDir, symbol, seed, cFilename, jsonFilename);
+  ms.enableChecking();
   // TESTING
   do {
     let result = "";

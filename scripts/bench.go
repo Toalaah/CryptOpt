@@ -132,7 +132,7 @@ func crossProduct(fields []paramField) []map[string]string {
 
 func makeRunID(params map[string]string) string {
 	standardOrder := []string{"optimizer", "curve", "method"}
-	ignore := []string{"no-proof"}
+	ignore := []string{"no-proof", "cacheDir"}
 	var parts []string
 	used := make(map[string]bool)
 

@@ -27,6 +27,8 @@ var (
 	benchFile  = flag.String("f", "./scripts/benchmarks.yml", "path to the benchmark YAML file (env: $BENCHMARK_CONFIG)")
 	numWorkers = flag.Int("j", runtime.NumCPU(), "number of parallel jobs (CPUs to use) (env: $BENCHMARK_NUM_WORKERS)")
 	baseDir    = flag.String("b", ".", "relative path to where results should be stored (env: $BENCHMARK_BASE_DIR)")
+	cacheDir   = flag.String("c", "", "set a cache dir to store cryptopt temporaries in (env: $BENCHMARK_CACHE_DIR)")
+	seed       = flag.String("s", "", "set a fixed seed to use for all benchmark runs. Can be overwritten by setting the seed as a benchmark parameter (which takes precedence over this option). (env: $BENCHMARK_SEED)")
 	timeout    = flag.Duration("t", 90*time.Minute, "relative path to where results should be stored (env: $BENCHMARK_TIMEOUT)")
 	proof      = flag.Bool("p", true, "whether to enable/disable proofs of final assembly (env: $BENCHMARK_PROOF)")
 )
@@ -50,6 +52,7 @@ type Benchmark struct {
 	Single                *Values `yaml:"single"`
 	Curve                 *Values `yaml:"curve"`
 	Evals                 *Values `yaml:"evals"`
+	Seed                  *Values `yaml:"seed"`
 	SaNumNeighbors        *Values `yaml:"saNumNeighbors"`
 	SaNeighborStrategy    *Values `yaml:"saNeighborStrategy"`
 	SaInitialTemperature  *Values `yaml:"saInitialTemperature"`
@@ -72,6 +75,7 @@ type Run struct {
 	Method                *string `flag:"method"`
 	Curve                 *string `flag:"curve"`
 	Evals                 *string `flag:"evals"`
+	Seed                  *string `flag:"seed"`
 	SaNumNeighbors        *string `flag:"saNumNeighbors"`
 	SaNeighborStrategy    *string `flag:"saNeighborStrategy"`
 	SaInitialTemperature  *string `flag:"saInitialTemperature"`
@@ -132,7 +136,7 @@ func crossProduct(fields []paramField) []map[string]string {
 
 func makeRunID(params map[string]string) string {
 	standardOrder := []string{"optimizer", "curve", "method"}
-	ignore := []string{"no-proof", "cacheDir"}
+	ignore := []string{"no-proof", "cacheDir", "seed"}
 	var parts []string
 	used := make(map[string]bool)
 
@@ -178,6 +182,9 @@ func makeRun(params map[string]string, baseDir string) Run {
 			rv.Field(i).Set(reflect.ValueOf(&v))
 		}
 	}
+	if *seed != "" && r.Seed == nil {
+		r.Seed = seed
+	}
 	r.ResultDir = filepath.Join(baseDir, makeRunID(params))
 	return r
 }
@@ -202,6 +209,9 @@ func (r Run) cliArgs() []string {
 	// }
 	if !*proof {
 		args = append(args, "--no-proof")
+	}
+	if *cacheDir != "" {
+		args = append(args, fmt.Sprintf("--cacheDir=%s", *cacheDir))
 	}
 	args = append(args, "--resultDir", r.ResultDir)
 	return args
@@ -310,6 +320,14 @@ func main() {
 		*baseDir = path
 	}
 
+	if path, ok := os.LookupEnv("BENCHMARK_CACHE_DIR"); ok {
+		*cacheDir = path
+	}
+
+	if s, ok := os.LookupEnv("BENCHMARK_SEED"); ok {
+		*seed = s
+	}
+
 	if path, ok := os.LookupEnv("BENCHMARK_CONFIG"); ok {
 		*benchFile = path
 	}
@@ -378,8 +396,20 @@ func main() {
 	fmt.Printf("Total runs: %d\n", len(runs))
 	fmt.Printf("Workers: %d (CPUs 0-%d)\n", *numWorkers, *numWorkers-1)
 	fmt.Printf("Base dir: %s\n", *baseDir)
+	fmt.Print("Cache dir: ")
+	if *cacheDir == "" {
+		fmt.Println("(default)")
+	} else {
+		fmt.Println(*cacheDir)
+	}
 	fmt.Printf("Using config: %s\n", *benchFile)
 	fmt.Printf("Proof-checking: %t\n", *proof)
+	fmt.Print("Fixed seed: ")
+	if *seed == "" {
+		fmt.Println("(none)")
+	} else {
+		fmt.Println(*seed)
+	}
 
 	fmt.Println()
 

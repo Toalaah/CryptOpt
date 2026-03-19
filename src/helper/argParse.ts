@@ -42,6 +42,7 @@ import {
   SA_NEIGHBOR_STRATEGY_GREEDY,
   OPTIMIZER_STRATEGY_BIASED,
 } from "@/types";
+import { tmpdir } from "node:os";
 
 const y = yargs(process.argv.slice(2));
 
@@ -274,6 +275,11 @@ export const parsedArgs = y
     string: true,
     default: "",
     describe: "Output log to file. If empty, no log file is generated",
+  })
+  .option("cacheDir", {
+    string: true,
+    default: tmpdir(),
+    describe: "Specify cache dir to store temporary CryptOpt artifacts to.",
   })
   .option("cyclegoal", {
     number: true,

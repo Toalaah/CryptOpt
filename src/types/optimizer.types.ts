@@ -56,6 +56,7 @@ export type OptimizerArgs = {
   readState?: string; // filename
   logComment: string;
   logFile?: string;
+  cacheDir: string;
   proof: boolean;
   verbose: boolean;
   bridge: BRIDGES_T;

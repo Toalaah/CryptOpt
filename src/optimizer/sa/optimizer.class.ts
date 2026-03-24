@@ -172,7 +172,8 @@ export class SAOptimizer extends Optimizer {
     let currentEpoch = 0;
     // const reannealThresh = this.initialTemperature * this.reAnnealRatio;
     let annealingIndex = 0; // Separate tracking of annealing step as we may reset it when re-annealing, thus breaking the prior invariant of epoch == annealingIndex.
-    let xBest: State = { asm: "", ratio: 0, cycleCount: 0 }; // Add slot for storing the best result we see.
+    let xBestRatio: State = { asm: "", ratio: 0, cycleCount: Infinity }; // Add slot for storing the best result we see.
+    let xBestCycle: State = { asm: "", ratio: 0, cycleCount: Infinity }; // Add slot for storing the best result we see.
     let current: State = { asm: "", ratio: 0, cycleCount: 0 };
     let temperature = 0;
     let showPerSecond = "many/s";
@@ -211,15 +212,23 @@ export class SAOptimizer extends Optimizer {
     };
 
     /**
-     * Updates best result. Returns true if best was improved, else false.
+     * Updates best results. Returns true if best was improved, else false.
      */
     const updateBest = (state: State) => {
-      // Could also filter by raw cycle count here, may have to experiment with what actually delivers better results.
-      if (state.ratio < xBest.ratio && xBest.ratio > 0) return false;
-      xBest.asm = state.asm;
-      xBest.ratio = state.ratio;
-      xBest.cycleCount = state.cycleCount;
-      return true;
+      let didUpdate = false;
+      if (state.ratio >= xBestRatio.ratio) {
+        xBestRatio.asm = state.asm;
+        xBestRatio.ratio = state.ratio;
+        xBestRatio.cycleCount = state.cycleCount;
+        didUpdate = true;
+      }
+      if (state.cycleCount <= xBestCycle.cycleCount) {
+        xBestCycle.asm = state.asm;
+        xBestCycle.ratio = state.ratio;
+        xBestCycle.cycleCount = state.cycleCount;
+        didUpdate = true;
+      }
+      return didUpdate;
     };
 
     /**
@@ -541,46 +550,60 @@ export class SAOptimizer extends Optimizer {
                   .join("\n"),
               );
 
-             writeString(mutationsCsvFile, globals.mutationLog.join("\n"));
+              writeString(mutationsCsvFile, globals.mutationLog.join("\n"));
 
-            // Also write out the global best.
-            {
-              const [xBestAsmFile] = generateResultFilename({ ...this.args, symbolname: this.symbolname }, [`_ratio${xBest.ratio.toFixed(4).replace(".", "")}_best.asm`]);
-              writeString(
-                xBestAsmFile,
-                ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
-                  .concat(xBest.asm)
-                  .concat(statistics)
-                  .join("\n"),
-              );
-            }
+              // Also write out the global best.
+              {
+                const [xBestRatioAsmFile, xBestCycleAsmFile] = generateResultFilename(
+                  { ...this.args, symbolname: this.symbolname },
+                  [
+                    `_ratio${xBestRatio.ratio.toFixed(4).replace(".", "")}_best_ratio.asm`,
+                    `_ratio${xBestCycle.ratio.toFixed(4).replace(".", "")}_best_cycle.asm`,
+                  ],
+                );
+                writeString(
+                  xBestRatioAsmFile,
+                  ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
+                    .concat(xBestRatio.asm)
+                    .concat(statistics)
+                    .join("\n"),
+                );
+                writeString(
+                  xBestCycleAsmFile,
+                  ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
+                    .concat(xBestCycle.asm)
+                    .concat(statistics)
+                    .join("\n"),
+                );
+              }
 
-            // Optionally prove correctness via fiat.
-            {
-              if (shouldProve(this.args)) {
-                const proofCmd = FiatBridge.buildProofCommand(this.args.curve, this.args.method, asmFile);
-                Logger.log(`proving that asm is correct with '${proofCmd}'`);
-                try {
-                  const now = Date.now();
-                  execSync(proofCmd, { shell: "/usr/bin/bash" });
-                  const timeForValidation = (Date.now() - now) / 1000;
-                  appendFileSync(asmFile, `\n; validated in ${timeForValidation}s\n`);
-                  globals.time.validate += timeForValidation;
-                } catch (e) {
-                  console.error(`tried to prove correct. didnt work. I tried ${proofCmd}`);
-                  errorOut(ERRORS.proofUnsuccessful);
+              // Optionally prove correctness via fiat.
+              {
+                if (shouldProve(this.args)) {
+                  const proofCmd = FiatBridge.buildProofCommand(this.args.curve, this.args.method, asmFile);
+                  Logger.log(`proving that asm is correct with '${proofCmd}'`);
+                  try {
+                    const now = Date.now();
+                    execSync(proofCmd, { shell: "/usr/bin/bash" });
+                    const timeForValidation = (Date.now() - now) / 1000;
+                    appendFileSync(asmFile, `\n; validated in ${timeForValidation}s\n`);
+                    globals.time.validate += timeForValidation;
+                  } catch (e) {
+                    console.error(`tried to prove correct. didnt work. I tried ${proofCmd}`);
+                    errorOut(ERRORS.proofUnsuccessful);
+                  }
                 }
               }
+              Logger.log("done with that current price of assembly code.");
+              if (!this.args.verbose) this.cleanLibcheckfunctions();
+              const v = this.measuresuite.destroy();
+              Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
+              resolve({
+                ratio: finalRatio,
+                cycleCount: finalCycle,
+                numEvals: currentEpoch,
+              });
             }
-            Logger.log("done with that current price of assembly code.");
-            if (!this.args.verbose) this.cleanLibcheckfunctions();
-            const v = this.measuresuite.destroy();
-            Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
-            resolve({
-              ratio: finalRatio,
-              cycleCount: finalCycle,
-              numEvals: currentEpoch,
-            });
           }
         } // End cleanup
       }, 0);

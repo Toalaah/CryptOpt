@@ -173,6 +173,7 @@ export class SAOptimizer extends Optimizer {
     // const reannealThresh = this.initialTemperature * this.reAnnealRatio;
     let annealingIndex = 0; // Separate tracking of annealing step as we may reset it when re-annealing, thus breaking the prior invariant of epoch == annealingIndex.
     let xBest: State = { asm: "", ratio: 0, cycleCount: 0 }; // Add slot for storing the best result we see.
+    let current: State = { asm: "", ratio: 0, cycleCount: 0 };
     let temperature = 0;
     let showPerSecond = "many/s";
     let perSecondCounter = 0;
@@ -201,10 +202,12 @@ export class SAOptimizer extends Optimizer {
       // const total = numAccepted + numRejected;
       // if (total < 500) return false;
       if (numRejected < this.maxNoImproveStreak) return false;
-      return globals.currentRatio < currentAnnealingCycleStartRatio;
-      // const percentageImprovement =
-      //   (globals.currentRatio - currentAnnealingCycleStartRatio) / currentAnnealingCycleStartRatio;
-      // return percentageImprovement <= 0.02;
+      // if (globals.currentRatio < currentAnnealingCycleStartRatio) return true;
+      const percentageImprovement =
+        (globals.currentRatio - currentAnnealingCycleStartRatio) / currentAnnealingCycleStartRatio;
+      if (percentageImprovement >= 0) return false; // We are better than at start of annealing cycle.
+      // We have decayed more than 2% since last reanneal
+      return -percentageImprovement >= 0.02;
     };
 
     /**
@@ -281,6 +284,7 @@ export class SAOptimizer extends Optimizer {
         // Check for errors, if nothing happens here we are probably fine for the rest of the run.
         if (candidates[CURRENT_FUNCTION].asm.includes("undefined"))
           errorOut({ msg: "ASM string empty/undefined, big yikes", exitCode: 1 });
+        current.asm = candidates[CURRENT_FUNCTION].asm;
       }
 
       const intervalHandle = setInterval(() => {
@@ -399,6 +403,9 @@ export class SAOptimizer extends Optimizer {
 
           const currentRatio = meanrawCheck / minRaw;
           const currentCycleCount = analyseResult.batchSizeScaledrawMedian[indexGood];
+          current.asm = candidates[CURRENT_FUNCTION].asm;
+          current.ratio = currentRatio;
+          current.cycleCount = currentCycleCount;
           globals.currentRatio = currentRatio;
           if (currentAnnealingCycleStartRatio == 0) currentAnnealingCycleStartRatio = currentRatio;
 
@@ -490,7 +497,12 @@ export class SAOptimizer extends Optimizer {
             const elapsed = Date.now() - optimistaionStartDate;
             const paddedSeed = padSeed(Paul.initialSeed);
 
-            globals.currentRatio = xBest.ratio;
+            let final = current;
+            const finalAsm = final.asm;
+            const finalRatio = final.ratio;
+            const finalCycle = final.cycleCount;
+
+            globals.currentRatio = finalRatio;
             ratioString = globals.currentRatio.toFixed(4);
             globals.convergence.push(ratioString);
 
@@ -524,12 +536,23 @@ export class SAOptimizer extends Optimizer {
               writeString(
                 asmFile,
                 ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
-                  .concat(xBest.asm)
+                  .concat(finalAsm)
                   .concat(statistics)
                   .join("\n"),
               );
 
-              writeString(mutationsCsvFile, globals.mutationLog.join("\n"));
+             writeString(mutationsCsvFile, globals.mutationLog.join("\n"));
+
+            // Also write out the global best.
+            {
+              const [xBestAsmFile] = generateResultFilename({ ...this.args, symbolname: this.symbolname }, [`_ratio${xBest.ratio.toFixed(4).replace(".", "")}_best.asm`]);
+              writeString(
+                xBestAsmFile,
+                ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
+                  .concat(xBest.asm)
+                  .concat(statistics)
+                  .join("\n"),
+              );
             }
 
             // Optionally prove correctness via fiat.
@@ -554,8 +577,8 @@ export class SAOptimizer extends Optimizer {
             const v = this.measuresuite.destroy();
             Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
             resolve({
-              ratio: xBest.ratio,
-              cycleCount: xBest.cycleCount,
+              ratio: finalRatio,
+              cycleCount: finalCycle,
               numEvals: currentEpoch,
             });
           }

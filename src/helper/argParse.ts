@@ -103,7 +103,7 @@ export const parsedArgs = y
   })
   .option("saAcceptParam", {
     number: true,
-    default: 1 / 5.515,
+    default: 0,
     describe: "Acceptance parameter value (has no effect if optimizer is not set to 'sa').",
   })
   .option("saNeighborStrategy", {
@@ -166,7 +166,7 @@ export const parsedArgs = y
   })
   .option("saMaxRejectStreakGoal", {
     number: true,
-    default: 20,
+    default: 1000,
     describe: "Min length of reject streak after which to allow reannealing.",
   })
   // END SA-specific args

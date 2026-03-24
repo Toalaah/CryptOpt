@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import fs from "fs";
+import fs, { read } from "fs";
 import { cloneDeep } from "lodash-es";
 
 import { DECISION_IDENTIFIER } from "@/enums";
@@ -167,6 +167,10 @@ export class Model {
     return Model._order.map((i) => Model._nodes[i]);
   }
 
+  public static get nodeLookupMap(): ReadonlyMap<string, number> {
+    return Model._nodeLookupMap;
+  }
+
   public static get nodeSetLength(): number {
     return Model._nodes.length;
   }
@@ -180,19 +184,21 @@ export class Model {
 
   // this is for spill decisions
   private _currentReadOrderIsValid = false;
-  private _currentReadOrder = [] as string[];
-  private get currentReadOrder(): string[] {
+  private _currentReadOrder = [] as string[][];
+  // Returns per-instruction read set, i.e _currentReadOrder[i] = all args read by instruction at position i.
+  private get currentReadOrder(): string[][] {
     if (!this._currentReadOrderIsValid) {
-      this._currentReadOrder = Model.nodesInTopologicalOrder.reduce((acc, node) => {
+      this._currentReadOrder = Model.nodesInTopologicalOrder.map((node) => {
+        const readSet: string[] = [];
         node.arguments.forEach((arg) => {
           const match = matchArg(arg);
-          if (match?.groups?.base) acc.push(match.groups.base); // arg1
-          acc.push(arg); // x1
+          if (match?.groups?.base) readSet.push(match.groups.base); // arg1
+          readSet.push(arg); // x1
           // although thats not true
-          acc.push(...limbify(arg)); // x1_0, x1_1
+          readSet.push(...limbify(arg)); // x1_0, x1_1
         });
-        return acc;
-      }, [] as string[]);
+        return readSet;
+      });
 
       this._currentReadOrderIsValid = true;
     }
@@ -229,13 +235,23 @@ export class Model {
     }
 
     const m = Model.getInstance();
-    const r = m.currentReadOrder;
+    const readSet = m.currentReadOrder;
     const fromIdx = Model._currentInstIdx;
 
     const map = candidates.reduce(
       (map, candidate) => {
-        const idx = r.indexOf(candidate, fromIdx);
-        map[candidate] = idx == -1 ? Infinity : idx;
+        let nextUse = Infinity;
+        for (let instIdx = fromIdx + 1; instIdx < readSet.length; instIdx++) {
+          // Go through each read set and check if we read from candidate list.
+          // If yes, that means that we read current candidate at instIdx.
+          if (readSet[instIdx].includes(candidate)) {
+            nextUse = instIdx;
+            break;
+          }
+        }
+        // Update candidate map to indicate when it is next read.
+        // No need to check for min/max here since instIdx (and thus nextUse) is monotonically increasing.
+        map[candidate] = nextUse;
         return map;
       },
       {} as { [varname: string]: number },

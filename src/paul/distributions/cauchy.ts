@@ -1,3 +1,5 @@
+import { Paul } from "../Paul.class";
+
 function createNDArray(shape: number[], sampler: () => number, depth: number = 0): any[] {
   const dim = shape[depth];
   const arr = new Array(dim);
@@ -18,7 +20,7 @@ function createNDArray(shape: number[], sampler: () => number, depth: number = 0
 function makeSampleScalar(params?: { loc?: number; scale?: number }) {
   const { loc = 0, scale = 1 } = params ?? {};
   const sampleScalar = (): number => {
-    const u = Math.random(); // U ~ Uniform(0,1)
+    const u = Paul.uniform();
     return loc + scale * Math.tan(Math.PI * (u - 0.5));
   };
   return sampleScalar;

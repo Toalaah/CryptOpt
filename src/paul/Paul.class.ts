@@ -171,6 +171,15 @@ export class Paul {
   }
 
   /**
+   * Returns a uniform number in [0,1].
+   */
+  public static uniform(): number {
+    const n = (Paul.getInstance()._state * 2) / Number.MAX_SAFE_INTEGER;
+    Paul.updateState();
+    return n;
+  }
+
+  /**
    * will update its state end return a number between
    * @param end -1 and @param start=0.
    * [start,end), start<=ret<end

@@ -122,7 +122,7 @@ export class SAOptimizer extends Optimizer {
     }
     if (this.acceptParam <= 0) return false;
 
-    const r = Math.random();
+    const r = Paul.uniform();
     const delta = (visitEnergy - currentEnergy) / this.acceptParam;
     if (!(delta >= 0)) errorOut({ exitCode: 123, msg: "negative delta" });
     const x = (-1 * delta) / temp;

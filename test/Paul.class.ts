@@ -70,6 +70,45 @@ describe("Paul", () => {
     });
   });
 
+  describe("uniform", () => {
+    it("should return values in [0, 1]", () => {
+      Paul.seed = 42;
+      for (let i = 0; i < 1000; i++) {
+        const v = Paul.uniform();
+        expect(v).toBeGreaterThanOrEqual(0);
+        expect(v).toBeLessThanOrEqual(1);
+      }
+    });
+
+    it("should have mean close to 0.5", () => {
+      Paul.seed = 42;
+      const N = 10_000;
+      let sum = 0;
+      for (let i = 0; i < N; i++) sum += Paul.uniform();
+      const mean = sum / N;
+      // For a uniform [0,1], std dev = 1/sqrt(12) ≈ 0.289, std error ≈ 0.00289
+      // Allow ±5 standard errors as tolerance
+      expect(mean).toBeGreaterThan(0.485);
+      expect(mean).toBeLessThan(0.515);
+    });
+
+    it("should pass a chi-squared uniformity test", () => {
+      Paul.seed = 123;
+      const N = 10_000;
+      const k = 10; // bins over [0, 1]
+      const bins = new Array<number>(k).fill(0);
+      for (let i = 0; i < N; i++) {
+        const v = Paul.uniform();
+        const bin = Math.min(Math.floor(v * k), k - 1);
+        bins[bin]++;
+      }
+      const expected = N / k;
+      const chi2 = bins.reduce((acc, obs) => acc + (obs - expected) ** 2 / expected, 0);
+      // chi2(9 dof) critical value at 0.001 significance level is ~27.88
+      expect(chi2).toBeLessThan(27.88);
+    });
+  });
+
   describe("chooseWithProbabilities", () => {
     it("should throw on probabilities that don't sum to 1", () => {
       expect(() => Paul.chooseWithProbabilities([0.5, 0.3])).toThrow("invalid probabily distribution");

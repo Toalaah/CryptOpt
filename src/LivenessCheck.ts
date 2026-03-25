@@ -34,6 +34,7 @@ import { ManualBridge } from "@/bridge/manual-bridge";
 import { Model } from "@/model";
 import { LivenessAnalyzer } from "@/registerAllocator/liveness";
 import type { CryptOpt } from "@/types";
+import { buildInterferenceGraph } from "./registerAllocator/interferenceGraph";
 
 const args = yargs(process.argv.slice(2))
   .scriptName("./LivenessCheck")
@@ -57,7 +58,10 @@ const { bridge, memoryConstraints } = parsedArgs;
 switch (bridge) {
   case "fiat": {
     const { curve, method } = parsedArgs as { curve: string; method: string };
-    Model.init({ memoryConstraints, json: new FiatBridge().getCryptOptFunction(method as never, curve as never) });
+    Model.init({
+      memoryConstraints,
+      json: new FiatBridge().getCryptOptFunction(method as never, curve as never),
+    });
     break;
   }
   case "bitcoin-core": {
@@ -82,7 +86,35 @@ switch (bridge) {
 Model.restoreFromFile(args.readState);
 
 const nodes = Model.nodesInTopologicalOrder;
-const { liveIn, liveOut } = LivenessAnalyzer.computeLiveness();
+const livenessInfo = LivenessAnalyzer.computeLiveness();
+const { liveIn, liveOut } = livenessInfo;
+
+// Collect all variables that appear in any liveIn/liveOut set.
+const allVars = new Set<string>();
+for (let i = 0; i < nodes.length; i++) {
+  for (const v of liveIn[i]) allVars.add(v);
+  for (const v of liveOut[i]) allVars.add(v);
+}
+
+const n = nodes.length;
+
+const liveRanges = new Map<string, number[]>();
+for (const v of [...allVars].sort()) {
+  const range = [0, 0];
+  let j = 0;
+  for (let i = 0; i < n; ++i) {
+    if (j == 2) break;
+    const isLiveAtI = liveIn[i].has(v) || liveOut[i].has(v);
+    if (isLiveAtI && j == 0) {
+      range[j++] = i;
+    } else if (!isLiveAtI && j == 1) {
+      range[j++] = i - 1;
+    } else if (j == 1 && i == n - 1) {
+      range[j++] = n - 1;
+    }
+  }
+  liveRanges.set(v, range);
+}
 
 for (let i = 0; i < nodes.length; i++) {
   const node = nodes[i];
@@ -90,6 +122,34 @@ for (let i = 0; i < nodes.length; i++) {
   const op = node.operation;
   const operands = node.arguments.join(", ");
   console.log(`[${i}] ${name} = ${op}(${operands})`);
+  if (liveRanges.has(name)) {
+    const range = liveRanges.get(name)!;
+    console.log(`  range: [${range[0]},${range[1]}]`);
+  }
   console.log(`  liveIn:  {${[...liveIn[i]].join(", ")}}`);
   console.log(`  liveOut: {${[...liveOut[i]].join(", ")}}`);
 }
+
+const maxVarLen = allVars.values().reduce((v, acc) => Math.max(v, acc.length), 0);
+console.log("\n=== Live Ranges ===");
+for (const v of [...allVars].sort()) {
+  // Position i is live if the variable is in liveIn[i] (live at instruction entry)
+  // or liveOut[i] (live at instruction exit, i.e. defined here and used later).
+  const bar = Array.from({ length: n }, (_, i) => (liveIn[i].has(v) || liveOut[i].has(v) ? "*" : "_")).join(
+    "",
+  );
+  console.log(`${v.padEnd(maxVarLen, " ")}: ${bar}`);
+}
+
+// const iGraph = buildInterferenceGraph(livenessInfo);
+//
+// console.log("\n=== Interference Graph ===");
+// const sortedNodes = [...iGraph.adj.keys()].sort();
+// for (const node of sortedNodes) {
+//   const neighbors = [...iGraph.adj.get(node)!].sort().join(", ");
+//   const degree = iGraph.degree.get(node)!;
+//   const precoloredLabel = iGraph.precolored.has(node)
+//     ? ` [precolored: ${iGraph.precoloredReg.get(node)}]`
+//     : "";
+//   console.log(`  ${node}${precoloredLabel} (degree ${degree}): {${neighbors}}`);
+// }

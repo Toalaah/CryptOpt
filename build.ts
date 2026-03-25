@@ -14,7 +14,7 @@ const tsconfigPath = "./tsconfig.json";
 fs.rmSync(outdir, { recursive: true, force: true });
 Bun.build({
   tsconfig: tsconfigPath,
-  entrypoints: ["./src/CountCycle.ts", "./src/CryptOpt.ts"],
+  entrypoints: ["./src/CountCycle.ts", "./src/CryptOpt.ts", "./src/LivenessCheck.ts"],
   target: "node",
   minify: !debug,
   outdir: outdir,

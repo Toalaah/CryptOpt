@@ -21,7 +21,7 @@ const external = [
 
 export default [
   {
-    input: ["src/CryptOpt.ts", "src/CountCycle.ts"],
+    input: ["src/CryptOpt.ts", "src/CountCycle.ts", "src/LivenessCheck.ts"],
     output: {
       dir: "dist",
       format: "es",

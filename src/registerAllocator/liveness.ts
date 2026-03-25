@@ -3,9 +3,9 @@ import { Model } from "@/model";
 import type { CryptOpt } from "@/types";
 
 export interface LivenessInfo {
-  /** Variables live immediately *before* instruction at position p. */
+  // The set of vars which are live immediately *before* instruction at position i.
   liveIn: ReadonlyArray<ReadonlySet<string>>;
-  /** Variables live immediately *after* instruction at position p. */
+  // Set of vars which are live immediately *after* instruction at position i
   liveOut: ReadonlyArray<ReadonlySet<string>>;
 }
 
@@ -40,6 +40,7 @@ function useSetForNode(node: CryptOpt.StringOperation, lookupMap: ReadonlyMap<st
   return s;
 }
 
+// See: https://proglang.informatik.uni-freiburg.de/teaching/compilerbau/2016ws/10-liveness.pdf
 function runBackwardPass(
   n: number,
   def: Set<string>[],
@@ -50,13 +51,13 @@ function runBackwardPass(
   to: number,
 ): void {
   for (let p = from; p >= to; p--) {
-    // liveOut[p] = liveIn[p+1]
+    // liveOut_p = liveIn_{p+1}
     const newOut = new Set<string>();
     if (p + 1 < n) {
       for (const v of liveIn[p + 1]) newOut.add(v);
     }
 
-    // liveIn[p] = use[p] ∪ (liveOut[p] \ def[p])
+    // liveIn_p = use_p + (liveOut_p - def_p)
     const newIn = new Set<string>(use[p]);
     for (const v of newOut) {
       if (!def[p].has(v)) newIn.add(v);
@@ -81,110 +82,21 @@ function runBackwardPass(
   }
 }
 
-/**
- * Stateless liveness analysis.  Reads from Model and returns a fresh result.
- * Use LivenessCache for repeated calls across optimizer iterations.
- */
+// Liveness analysis. Reads from Model and returns a fresh result.
+// TODO: cache repeated calls or if topo order did not change
 export class LivenessAnalyzer {
   static computeLiveness(): LivenessInfo {
     const nodes = Model.nodesInTopologicalOrder;
     const lookupMap = Model.nodeLookupMap;
-    const n = nodes.length;
-    if (n === 0) return { liveIn: [], liveOut: [] };
+    const nodeCount = nodes.length;
+    if (nodeCount === 0) return { liveIn: [], liveOut: [] };
 
     const def = nodes.map(defSetForNode);
     const use = nodes.map((nd) => useSetForNode(nd, lookupMap));
 
-    const liveIn: Set<string>[] = Array.from({ length: n }, () => new Set<string>());
-    const liveOut: Set<string>[] = Array.from({ length: n }, () => new Set<string>());
-    runBackwardPass(n, def, use, liveIn, liveOut, n - 1, 0);
-
+    const liveIn: Set<string>[] = Array.from({ length: nodeCount }, () => new Set<string>());
+    const liveOut: Set<string>[] = Array.from({ length: nodeCount }, () => new Set<string>());
+    runBackwardPass(nodeCount, def, use, liveIn, liveOut, nodeCount - 1, 0);
     return { liveIn, liveOut };
-  }
-}
-
-/**
- * Stateful wrapper that caches liveness arrays between assemble() calls.
- *
- * Usage pattern in the assembly pre-pass:
- *   - Call computeFull() on the first call or after a structural reset.
- *   - Call partialUpdate(lo, hi) after a PERMUTE mutation that changed the
- *     topological order in positions [lo, hi].
- *   - The cached LivenessInfo is available via the `info` getter.
- *
- * Thread-safety: single-threaded use only (the CryptOpt optimizer is
- * single-threaded).
- */
-export class LivenessCache {
-  private _n = 0;
-  private _def: Set<string>[] = [];
-  private _use: Set<string>[] = [];
-  private _liveIn: Set<string>[] = [];
-  private _liveOut: Set<string>[] = [];
-  private _valid = false;
-
-  /** Fully recompute liveness from the current Model state. */
-  computeFull(): LivenessInfo {
-    const nodes = Model.nodesInTopologicalOrder;
-    const lookupMap = Model.nodeLookupMap;
-    this._n = nodes.length;
-
-    if (this._n === 0) {
-      this._def = [];
-      this._use = [];
-      this._liveIn = [];
-      this._liveOut = [];
-      this._valid = true;
-      return { liveIn: this._liveIn, liveOut: this._liveOut };
-    }
-
-    this._def = nodes.map(defSetForNode);
-    this._use = nodes.map((nd) => useSetForNode(nd, lookupMap));
-    this._liveIn = Array.from({ length: this._n }, () => new Set<string>());
-    this._liveOut = Array.from({ length: this._n }, () => new Set<string>());
-    runBackwardPass(this._n, this._def, this._use, this._liveIn, this._liveOut, this._n - 1, 0);
-
-    this._valid = true;
-    return { liveIn: this._liveIn, liveOut: this._liveOut };
-  }
-
-  /**
-   * Incrementally update liveness after a PERMUTE mutation that swapped
-   * nodes in topological positions lo..hi.
-   *
-   * Recomputes def/use for [lo, hi], then runs the backward pass from hi
-   * back toward 0, stopping early when no further changes propagate.
-   *
-   * Complexity: O((hi - lo + 1 + propagation_depth) × |live_vars|)
-   * vs. O(n × |live_vars|) for a full recompute — typically 10-50× faster
-   * for the small permutation windows that arise in the optimizer.
-   */
-  partialUpdate(lo: number, hi: number): LivenessInfo {
-    if (!this._valid) return this.computeFull();
-
-    const nodes = Model.nodesInTopologicalOrder;
-    const lookupMap = Model.nodeLookupMap;
-
-    // Recompute def/use for the positions that changed.
-    for (let p = lo; p <= hi; p++) {
-      this._def[p] = defSetForNode(nodes[p]);
-      this._use[p] = useSetForNode(nodes[p], lookupMap);
-    }
-
-    // Re-run the backward pass from hi down to 0 (with early termination).
-    runBackwardPass(this._n, this._def, this._use, this._liveIn, this._liveOut, hi, 0);
-
-    return { liveIn: this._liveIn, liveOut: this._liveOut };
-  }
-
-  /** The currently cached LivenessInfo, or null if not yet computed. */
-  get info(): LivenessInfo | null {
-    if (!this._valid) return null;
-    return { liveIn: this._liveIn, liveOut: this._liveOut };
-  }
-
-  /** Invalidate the cache (forces full recompute on next call). */
-  invalidate(): void {
-    this._valid = false;
   }
 }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import fs, { read } from "fs";
+import fs from "fs";
 import { cloneDeep } from "lodash-es";
 
 import { DECISION_IDENTIFIER } from "@/enums";
@@ -182,6 +182,9 @@ export class Model {
 
   private static _currentInstIdx = -1;
 
+  // After a perm mutation, set to [lo, hi] where lo = min(chosen, partner) and hi = max(chosen, partner). Allows for caching of liveness checker. Invalided by decision mutations or reverts.
+  public static _lastPermWindow: [number, number] | null = null;
+
   // this is for spill decisions
   private _currentReadOrderIsValid = false;
   private _currentReadOrder = [] as string[][];
@@ -316,6 +319,7 @@ export class Model {
     const b = Model._order[partner];
     Model._order.splice(partner, 0, a);
     m._currentReadOrderIsValid = false;
+    Model._lastPermWindow = [Math.min(chosen, partner), Math.max(chosen, partner)];
     // indexes.length == 0; // invalidate read-cache if there was anything mutated.
 
     Logger.log(
@@ -348,6 +352,7 @@ export class Model {
 
   public static mutateDecision(): boolean {
     Model.getInstance().backupbody();
+    Model._lastPermWindow = null;
 
     // find indexes of instructions, which have decisions attached
     const candidateIndexes = Model._nodes.reduce((prev, { decisionsHot }, idx) => {
@@ -433,6 +438,7 @@ export class Model {
     Model._nodes = state.nodes;
     Model._order = state.order;
     this._currentReadOrderIsValid = false;
+    Model._lastPermWindow = null;
   }
 
   public static restoreSnapshot(id: string) {
@@ -448,6 +454,7 @@ export class Model {
   private loadbackupbody(): void {
     Model._nodes = this.backup.nodes;
     Model._order = this.backup.order;
+    Model._lastPermWindow = null;
   }
 
   private backupbody(): void {
@@ -529,6 +536,7 @@ export class Model {
   }
 
   public static startNewImplementation(): void {
+    Model._lastPermWindow = null;
     // clearing Decision Hotness
     Model._nodes.forEach((node) => {
       node.decisionsHot.splice(0, node.decisionsHot.length);

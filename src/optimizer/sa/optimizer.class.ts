@@ -623,14 +623,14 @@ function makeExpCoolingSchedule(visitParam: number, initialTemp: number): Coolin
 
 function makeLinCoolingSchedule(nEval: number, visitParam: number, initialTemp: number): CoolingSchedule {
   return (t: number) => {
-    const factor = clamp(t / nEval, 0, 1);
-    return initialTemp * (1 - factor) * visitParam;
+    const factor = clamp((t * visitParam) / nEval, 0, 1);
+    return initialTemp * (1 - factor);
   };
 }
 
 function makeLogCoolingSchedule(visitParam: number, initialTemp: number): CoolingSchedule {
   return (t: number) => {
-    const a = Math.log(visitParam * (t + 1));
+    const a = Math.log(visitParam * t + Math.E);
     const temp = initialTemp / a;
     return temp < 0 ? 0 : temp;
   };

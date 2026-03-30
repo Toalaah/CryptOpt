@@ -236,6 +236,12 @@ export const parsedArgs = y
     required: false,
     default: "",
   })
+  .option("dynamicOperationOrdering", {
+    default: false,
+    describe:
+      "Enables a feedback mechanism where the Model can defer from its standard operation ordering by influencing instruction scheduling based upon register contents.",
+    boolean: true,
+  })
   .option("proof", {
     default: true,
     describe:

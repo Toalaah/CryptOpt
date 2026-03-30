@@ -19,52 +19,73 @@ import { Logger } from "@/helper/Logger.class";
 import { getInstruction } from "@/instructionGeneration/InstructionGenerator";
 import { Model } from "@/model";
 import { RegisterAllocator } from "@/registerAllocator";
-import type { asm, CryptOpt } from "@/types";
+import type { asm, CryptOpt, AssemblerArgs } from "@/types";
 
 import { sanityCheckAllocations } from "./assembler.helper";
 
 export const strip = (code: asm[]) => code.filter((line) => line && !line.startsWith(";") && line !== "\n");
 
-export function assemble(resultspath: string): { stacklength: number; code: asm[] } {
-  Logger.log("initializing RA.");
-  const ra = RegisterAllocator.reset();
+export class Assembler {
+  private static _options: AssemblerArgs | null = null;
 
-  const output = ra.pres;
-  // right ater the construction in ra.pres will be prose comments for which arg is in which reg
-
-  Logger.log("initializing Model.");
-  Model.startNewImplementation();
-  let curOp: CryptOpt.StringOperation | null = null;
-  while ((curOp = Model.nextOperation())) {
-    try {
-      const ins = getInstruction(curOp);
-
-      output.push(...ins);
-      Logger.log(sanityCheckAllocations(curOp)); // bit of a hack to remove it in non-debug mode
-    } catch (e) {
-      const ra = RegisterAllocator.getInstance();
-      const pres = ra.pres;
-      let allocs = ra.getCurrentAllocations();
-      allocs = Object.fromEntries(Object.entries(allocs).sort(([e1], [e2]) => e1.localeCompare(e2)));
-
-      const failfile = `${resultspath}/lastFail.asm`;
-      console.warn({ curOperation: curOp, e, allocs, pres, failfile });
-      console.error({ curOperation: curOp, e, allocs, pres, failfile });
-
-      writeString(
-        failfile,
-        output
-          .map((i) => `\t${i}`)
-          .concat(Model.order)
-          .concat(`ErrorStack: ${e instanceof Error ? e.stack : JSON.stringify(e)}`)
-          .join("\n") + `while doing ${JSON.stringify(curOp, undefined, 2)}`,
-      );
-      throw e;
-    }
-    RegisterAllocator.getInstance().clearOrphans();
+  public static set options(op: AssemblerArgs) {
+    Assembler._options = op;
   }
-  const { pre, post, stacklength } = ra.finalize();
-  const code = pre.concat(output).concat(post);
 
-  return { code, stacklength };
+  public static assemble(resultspath: string): { stacklength: number; code: asm[] } {
+    Logger.log("initializing RA.");
+    const ra = RegisterAllocator.reset();
+
+    const output = ra.pres;
+    // right ater the construction in ra.pres will be prose comments for which arg is in which reg
+
+    Logger.log("initializing Model.");
+    Model.startNewImplementation();
+    const nextOperation = () => {
+      switch (!!Assembler._options?.dynamicOperationOrdering) {
+        case true:
+          return Model.nextOperationDynamic();
+        default:
+          return Model.nextOperation();
+      }
+    };
+    let curOp: CryptOpt.StringOperation | null = null;
+    while ((curOp = nextOperation())) {
+      try {
+        const ins = getInstruction(curOp);
+
+        output.push(...ins);
+        Logger.log(sanityCheckAllocations(curOp)); // bit of a hack to remove it in non-debug mode
+      } catch (e) {
+        const ra = RegisterAllocator.getInstance();
+        const pres = ra.pres;
+        let allocs = ra.getCurrentAllocations();
+        allocs = Object.fromEntries(Object.entries(allocs).sort(([e1], [e2]) => e1.localeCompare(e2)));
+
+        const failfile = `${resultspath}/lastFail.asm`;
+        console.warn({ curOperation: curOp, e, allocs, pres, failfile });
+        console.error({ curOperation: curOp, e, allocs, pres, failfile });
+
+        writeString(
+          failfile,
+          output
+            .map((i) => `\t${i}`)
+            .concat(Model.order)
+            .concat(`ErrorStack: ${e instanceof Error ? e.stack : JSON.stringify(e)}`)
+            .join("\n") + `while doing ${JSON.stringify(curOp, undefined, 2)}`,
+        );
+        throw e;
+      }
+      RegisterAllocator.getInstance().clearOrphans();
+    }
+    if (!!Assembler._options?.dynamicOperationOrdering) Model.finalize();
+    const { pre, post, stacklength } = ra.finalize();
+    const code = pre.concat(output).concat(post);
+
+    return { code, stacklength };
+  }
+}
+
+export function assemble(resultspath: string) {
+  return Assembler.assemble(resultspath);
 }

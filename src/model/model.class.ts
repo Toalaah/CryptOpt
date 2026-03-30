@@ -17,7 +17,7 @@
 import fs from "fs";
 import { cloneDeep } from "lodash-es";
 
-import { DECISION_IDENTIFIER } from "@/enums";
+import { DECISION_IDENTIFIER, Register } from "@/enums";
 import {
   assertStringArguments,
   bl,
@@ -42,12 +42,14 @@ import type { CryptOpt, MEMORY_CONSTRAINTS_OPTIONS_T } from "@/types";
 type Backup = { nodes: Readonly<CryptOpt.StringOperation>[]; order: number[] };
 
 import { createDependencyRelation, nodeLookupMap } from "./model.helper";
+import { RegisterAllocator } from "@/registerAllocator";
 type modelState = ReturnType<typeof Model.getState> & { parsedArgs: CryptOpt.StateFile["parsedArgs"] };
 type methodParam = CryptOpt.Function["arguments"][number] | CryptOpt.Function["returns"][number];
 export class Model {
   // this is set once.
   private static _nodes: Readonly<CryptOpt.StringOperation>[] = [];
   private static _order: number[] = []; // indexes into Model._nodes
+  private static _orderBackup: number[] = []; // indexes into Model._nodes
   private static _neededBy: Map<string, Set<string>>;
 
   // from any name to the index of the node which calculates this name.
@@ -291,7 +293,7 @@ export class Model {
       }
     }
     // once we found the first dependent one, or we are over the order_length
-    // we want to have 'max' to te last one which is independent
+    // we want to have 'max' to the last one which is independent
     max--;
 
     // backward
@@ -302,7 +304,7 @@ export class Model {
       }
     }
     // once we found the first dependent one, or if min is now -1
-    // we want to have 'min' to te last one which is independent
+    // we want to have 'min' to the last one which is independent
     min++;
 
     if (min == max) {
@@ -541,9 +543,14 @@ export class Model {
     Model._nodes.forEach((node) => {
       node.decisionsHot.splice(0, node.decisionsHot.length);
     });
-
+    // Backup order so that we restore after dynamic op switching.
+    Model._orderBackup = [...Model._order];
     // and initializing the pointer.
     Model._currentInstIdx = -1;
+  }
+
+  public static finalize() {
+    Model._order = [...Model._orderBackup];
   }
 
   public static nextOperation(): CryptOpt.StringOperation | null {
@@ -552,5 +559,76 @@ export class Model {
       return Model._nodes[nextIdx];
     }
     return null;
+  }
+
+  /*
+   * Returns next instruction dynamically based upon current register allocs
+   * Current POC strategy: +1 score per argument already in a GP register. If there are ties, just return the first candidate.
+   */
+  public static nextOperationDynamic(): CryptOpt.StringOperation | null {
+    if (Model._currentInstIdx == -1) return this.nextOperation(); // Always initially return operation as we would in nextOperation().
+    if (Model._currentInstIdx >= Model._order.length) return null;
+
+    const allocs = RegisterAllocator.getInstance().getCurrentAllocations();
+    const currentPos = ++Model._currentInstIdx;
+
+    if (currentPos >= Model._order.length) return null;
+
+    // Find all schedulable nodes among positions [currentPos,n-1].
+    const schedulable: number[] = [];
+    outer: for (let p = currentPos; p < Model._order.length; p++) {
+      const pNodeIdx = Model._order[p];
+      for (let q = currentPos; q < Model._order.length; q++) {
+        if (q === p) continue;
+        if (isADependentOnB(pNodeIdx, Model._order[q], Model._nodes, Model._neededBy)) {
+          continue outer; // p directly needs an output of unissued q
+        }
+      }
+      schedulable.push(p);
+    }
+
+    // Fallback to default model order if no schedulable candidates were found
+    if (schedulable.length === 0) {
+      return Model._nodes[Model._order[currentPos]];
+    }
+
+    // Now to score the eligible candidates.
+    const registers = new Set<string>(Object.values(Register));
+    const scored = schedulable.map((p) => {
+      const node = Model._nodes[Model._order[p]];
+      // TODO: if the node will consume a GP allocation for the LAST time, i.e it is the last consumer, also add 1 for each var it will consume as last reader (as we will be freeing a reg!)
+      let score = 0;
+      for (const arg of node.arguments) {
+        // Check arg and all its limb variants ("x5" -> ["x5", "x5_0", "x5_1"])
+        const limbs = [arg, ...limbify(arg)];
+        for (const variant of limbs) {
+          const alloc = allocs[variant];
+          if (alloc && "store" in alloc && alloc.store != null && registers.has(alloc.store as string)) {
+            score += 1; // argument is live in a GP register
+            // Here we could put more complex heuristics, e.g:
+            // if (node.operation === "*" || node.operation === "mulx" && alloc.store === Register.rdx) {
+            //   score += 2; // multiply operand already in rdx
+            // }
+            // count each argument at most once
+            break;
+          }
+        }
+      }
+      return { p, node, score };
+    });
+
+    // Pick among the highest-scored candidates
+    const maxScore = scored.reduce((max, s) => (s.score > max ? s.score : max), 0);
+    const best = scored.filter((s) => s.score === maxScore);
+    const chosen = best[0];
+
+    // Swap chosen position with currentPos so _currentInstIdx remains a consistent
+    if (chosen.p !== currentPos) {
+      const tmp = Model._order[currentPos];
+      Model._order[currentPos] = Model._order[chosen.p];
+      Model._order[chosen.p] = tmp;
+    }
+
+    return chosen.node;
   }
 }

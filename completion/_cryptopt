@@ -48,6 +48,7 @@ _arguments -S -s \
     '--cyclegoal=[Number of cycles to measure, adjusts batch size dynamically]:cg:' \
     '--logComment=[Hint displayed during optimization]:lc:' \
     '--logFile=[Write to specified log file]:log_file:' \
+    '(--no-dynamicOperationOrdering --dynamicOperationOrdering)'{--no-dynamicOperationOrdering,--dynamicOperationOrdering}'[Enables a feedback mechanism where the Model can defer from its standard operation ordering by influencing instruction scheduling based upon register contents.]:dynamicOperationOrdering:' \
     '(--no-proof --proof)'{--no-proof,--proof}'[Dis-/En ables proofing. Default on with fiat, default off elsewhere]:proof:' \
     '(-v --verbose)'{-v,--verbose}'[Write a lot of log messages (if compiled with DEBUG=1)]:verbose' \
     '(-z --redzone --no-redzone)'{-z,--redzone,--no-redzone}'[Specify if the redzone should be used at stack spilling]:redzone' \

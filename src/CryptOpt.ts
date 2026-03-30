@@ -36,10 +36,11 @@ import { registerExitHooks } from "@/helper/process";
 import { Model } from "@/model";
 import { OptimizerFactory, Optimizer, OptimizerResult, MutationStats } from "@/optimizer";
 import { sha1Hash } from "@/paul";
-import { OPTIMIZER_STRATEGY_RLS, CryptOpt, type CryptoptGlobals, type ParsedArgsT } from "@/types";
+import { CryptOpt, type CryptoptGlobals, type ParsedArgsT } from "@/types";
 
 import { Logger, FileLogger } from "./helper/Logger.class";
 import globals from "./helper/globals";
+import { Assembler } from "./assembler";
 
 let parsedArgs = parsedArgsFromCli;
 if (parsedArgs.startFromBestJson) {
@@ -84,6 +85,10 @@ if (logFile) FileLogger.init(logFile);
 if (parsedArgs.resultDir == "") {
   parsedArgs.resultDir = resolve(process.cwd(), "results");
 }
+
+// Set assembler options
+Assembler.options = parsedArgs;
+
 // GENERAL INITIALIZATION
 if (!verbose) {
   console.log = () => {

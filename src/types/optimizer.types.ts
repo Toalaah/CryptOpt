@@ -68,7 +68,11 @@ export type OptimizerArgs = {
   preferXmm?: boolean;
   framePointer: FRAME_POINTER_OPTIONS_T;
   memoryConstraints: MEMORY_CONSTRAINTS_OPTIONS_T;
+  dynamicOperationOrdering: boolean;
 };
+
+export type AssemblerArgs = Pick<OptimizerArgs, "dynamicOperationOrdering">;
+
 export type ParsedArgsT = OptimizerArgs & {
   startFromBestJson: boolean;
   single: boolean;

@@ -69,6 +69,7 @@ type Benchmark struct {
 	BetRatio                 *Values `yaml:"betRatio"`
 	Cyclegoal                *Values `yaml:"cyclegoal"`
 	DynamicOperationOrdering *Values `yaml:"dynamicOperationOrdering"`
+	ContinueRun              *Values `yaml:"continueRun"`
 }
 
 type Run struct {
@@ -94,6 +95,7 @@ type Run struct {
 	Single                   *string `flag:"single"`
 	Cyclegoal                *string `flag:"cyclegoal"`
 	DynamicOperationOrdering *string `flag:"dynamicOperationOrdering"`
+	ContinueRun              *string `flag:"continueRun"`
 	ResultDir                string  `flag:"-"`
 }
 
@@ -138,7 +140,7 @@ func crossProduct(fields []paramField) []map[string]string {
 
 func makeRunID(params map[string]string) string {
 	standardOrder := []string{"optimizer", "curve", "method"}
-	ignore := []string{"no-proof", "cacheDir", "seed"}
+	ignore := []string{"no-proof", "cacheDir", "seed", "continueRun"}
 	var parts []string
 	used := make(map[string]bool)
 
@@ -204,11 +206,18 @@ func (r Run) cliArgs() []string {
 		if field.IsNil() {
 			continue
 		}
-		args = append(args, "--"+tag, field.Elem().String())
+		v := field.Elem().String()
+		args = append(args, "--"+tag)
+		if v != "" {
+			args = append(args, field.Elem().String())
+		}
 	}
 	// if r.Optimizer != nil && *r.Optimizer == "sa" {
 	// 	args = append(args, "--single")
 	// }
+	if r.ContinueRun != nil {
+		args = append(args, fmt.Sprintf("--readState=%s-%s.json", *r.Curve, *r.Method))
+	}
 	if !*proof {
 		args = append(args, "--no-proof")
 	}
@@ -273,7 +282,7 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 		case res := <-cmdDone:
 			if err := res.err; err != nil {
 				count := completed.Add(1)
-				log.Printf("[CPU %d] [%d/%d] Error running %s: %v", cpuID, count, total, id, err)
+				log.Printf("[CPU %d] [%d/%d] Error running %s: %v\n%s", cpuID, count, total, id, err, string(res.outb))
 				os.RemoveAll(tmpDir)
 				continue
 			}

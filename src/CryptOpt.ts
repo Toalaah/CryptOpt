@@ -76,6 +76,16 @@ else if (parsedArgsFromCli.readState) {
   if (stateFile.parsedArgs) {
     parsedArgs = stateFile.parsedArgs;
   }
+
+  // // Restore some
+  if (parsedArgsFromCli.continueRun) {
+    parsedArgs.dynamicOperationOrdering = parsedArgsFromCli.dynamicOperationOrdering;
+    parsedArgs.single = parsedArgsFromCli.single;
+    parsedArgs.seed = parsedArgsFromCli.seed;
+    parsedArgs.tabuUniqueFactorGoal = parsedArgsFromCli.tabuUniqueFactorGoal;
+    parsedArgs.evals = parsedArgsFromCli.evals;
+    parsedArgs.resultDir = parsedArgsFromCli.resultDir;
+  }
 }
 
 const { bets, betRatio, curve, method, logFile, verbose } = parsedArgs;

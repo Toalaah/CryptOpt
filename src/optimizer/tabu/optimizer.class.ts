@@ -132,7 +132,7 @@ export class TabuOptimizer extends Optimizer {
         while (true) {
           this.mutate({ updateStats: false });
           asm = assemble(slot);
-          if (this.isNew(asm)) break;
+          if (this.isNew(asm).isNew) break;
           else Model.revertLastMutation();
         }
       } else {

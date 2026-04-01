@@ -38,6 +38,7 @@ _arguments -S -s \
     '(-j --jsonFile -c --curve -m --method)'{-j,--jsonFile=}'[JSON-CODE, must --bridge manual]:json:_files -g \*.json' \
     '(-f --cFile -c --curve -m --method)'{-f,--cFile=}'[C-CODE must --bridge manual]:cfile:_files -g \*.c' \
     '--readState=[Continue from this State file]:statejson:_files -g \*.json' \
+    '--continueRun=[Allows for overwriting some statefile args with cli]:continueRun' \
     '--startFromBestJson=[Scan for the best of all current state files and continue for from the best one.]:statefile:_files -g \*.json' \
     '--resultDir=[Where to safe the result-files (assembly, pdfs, ...)]:directory:_path_files -/' \
     '--cacheDir=[Where to store temporary files to]:directory:_path_files -/' \

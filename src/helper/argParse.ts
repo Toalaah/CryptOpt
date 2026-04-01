@@ -267,6 +267,12 @@ export const parsedArgs = y
     describe: "this must be a filename to a JSON, which has a state (to, body).",
     demandOption: false,
   })
+  .option("continueRun", {
+    boolean: true,
+    default: false,
+    describe:
+      "If set, will continue from passed state (requires readState). In this setting, parsed args take precedence over read state.",
+  })
   .option("startFromBestJson", {
     boolean: true,
     default: false,
@@ -314,32 +320,48 @@ export const parsedArgs = y
       return Math.pow(1000, idx + 1) * Number(evals.substring(0, evals.length - 1));
     },
   })
-  .check(({ evals, bridge, cFile, jsonFile, method, curve, saMutStepSizeMax, saMutStepSizeMin }) => {
-    if (evals <= 0) {
-      throw new Error("--evals must be >0");
-    }
-    if (bridge == "manual" && (!jsonFile || !cFile)) {
-      throw new Error("Bridge is set to manual, but either json or c file is not specified.");
-    }
-    if (saMutStepSizeMin > saMutStepSizeMax) {
-      throw new Error("--saMutStepSizeMin must be <= --saMutStepSizeMax");
-    }
-    if (["", "fiat"].includes(bridge)) {
-      if (!FIAT_METHODS.includes(method as FIAT_METHOD_T)) {
-        throw new Error(`Bridge is Fiat; the specified method '${method}' is not available.`);
+  .check(
+    ({
+      evals,
+      bridge,
+      cFile,
+      jsonFile,
+      method,
+      curve,
+      saMutStepSizeMax,
+      saMutStepSizeMin,
+      continueRun,
+      readState,
+    }) => {
+      if (continueRun && !readState) {
+        throw new Error("--continueRun implies setting --readState");
       }
+      if (evals <= 0) {
+        throw new Error("--evals must be >0");
+      }
+      if (bridge == "manual" && (!jsonFile || !cFile)) {
+        throw new Error("Bridge is set to manual, but either json or c file is not specified.");
+      }
+      if (saMutStepSizeMin > saMutStepSizeMax) {
+        throw new Error("--saMutStepSizeMin must be <= --saMutStepSizeMax");
+      }
+      if (["", "fiat"].includes(bridge)) {
+        if (!FIAT_METHODS.includes(method as FIAT_METHOD_T)) {
+          throw new Error(`Bridge is Fiat; the specified method '${method}' is not available.`);
+        }
 
-      if (!FIAT_CURVES.includes(curve as FIAT_CURVE_T)) {
-        throw new Error(`Bridge is Fiat; the specified curve '${curve}' is not available.`);
+        if (!FIAT_CURVES.includes(curve as FIAT_CURVE_T)) {
+          throw new Error(`Bridge is Fiat; the specified curve '${curve}' is not available.`);
+        }
       }
-    }
-    if (bridge == "bitcoin-core") {
-      if (!BITCOIN_CORE_METHODS.includes(method as BITCOIN_CORE_METHOD_T)) {
-        throw new Error(`Bridge is bitcoin-core. The specified method '${method}' not available.`);
+      if (bridge == "bitcoin-core") {
+        if (!BITCOIN_CORE_METHODS.includes(method as BITCOIN_CORE_METHOD_T)) {
+          throw new Error(`Bridge is bitcoin-core. The specified method '${method}' not available.`);
+        }
       }
-    }
-    return true;
-  })
+      return true;
+    },
+  )
   .option("framePointer", {
     default: "omit",
     string: true,

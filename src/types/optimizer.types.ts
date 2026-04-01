@@ -54,6 +54,7 @@ export type OptimizerArgs = {
   // END SA-specific args
   cyclegoal: number;
   readState?: string; // filename
+  continueRun: boolean;
   logComment: string;
   logFile?: string;
   cacheDir: string;

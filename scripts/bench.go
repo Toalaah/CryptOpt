@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
@@ -268,8 +269,10 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 		fmt.Printf("[CPU %d] %s: Running: %s\n", cpuID, time.Now().Format(time.DateTime), id)
 		start := time.Now()
 		go func() {
-			outb, err := cmd.CombinedOutput()
-			cmdDone <- cmdResult{outb, err}
+			var outb bytes.Buffer
+			cmd.Stderr = &outb
+			err := cmd.Run()
+			cmdDone <- cmdResult{outb.Bytes(), err}
 		}()
 
 		select {
@@ -282,7 +285,7 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 		case res := <-cmdDone:
 			if err := res.err; err != nil {
 				count := completed.Add(1)
-				log.Printf("[CPU %d] [%d/%d] Error running %s: %v\n%s", cpuID, count, total, id, err, string(res.outb))
+				log.Printf("[CPU %d] [%d/%d] Error running %s: %v: %s", cpuID, count, total, id, err, string(res.outb))
 				os.RemoveAll(tmpDir)
 				continue
 			}

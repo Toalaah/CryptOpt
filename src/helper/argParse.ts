@@ -242,6 +242,14 @@ export const parsedArgs = y
       "Enables a feedback mechanism where the Model can defer from its standard operation ordering by influencing instruction scheduling based upon register contents.",
     boolean: true,
   })
+  .option("registerPressureThresh", {
+    number: true,
+    default: 1.0,
+    describe:
+      "Register occupancy threshold above which preemptive spilling is performed (live range splitting)",
+    min: 0,
+    max: 1,
+  })
   .option("proof", {
     default: true,
     describe:

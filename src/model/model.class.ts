@@ -563,7 +563,6 @@ export class Model {
 
   /*
    * Returns next instruction dynamically based upon current register allocs
-   * Current POC strategy: +1 score per argument already in a GP register. If there are ties, just return the first candidate.
    */
   public static nextOperationDynamic(): CryptOpt.StringOperation | null {
     if (Model._currentInstIdx == -1) return this.nextOperation(); // Always initially return operation as we would in nextOperation().
@@ -596,20 +595,18 @@ export class Model {
     const registers = new Set<string>(Object.values(Register));
     const scored = schedulable.map((p) => {
       const node = Model._nodes[Model._order[p]];
-      // TODO: if the node will consume a GP allocation for the LAST time, i.e it is the last consumer, also add 1 for each var it will consume as last reader (as we will be freeing a reg!)
-      let score = 0;
+      const numOut = node.name.length;
+      let score = 2 - numOut;
       for (const arg of node.arguments) {
         // Check arg and all its limb variants ("x5" -> ["x5", "x5_0", "x5_1"])
         const limbs = [arg, ...limbify(arg)];
         for (const variant of limbs) {
           const alloc = allocs[variant];
           if (alloc && "store" in alloc && alloc.store != null && registers.has(alloc.store as string)) {
-            score += 1; // argument is live in a GP register
-            // Here we could put more complex heuristics, e.g:
-            // if (node.operation === "*" || node.operation === "mulx" && alloc.store === Register.rdx) {
-            //   score += 2; // multiply operand already in rdx
-            // }
-            // count each argument at most once
+            score += 1;
+            if (node.operation === "*" || (node.operation === "mulx" && alloc.store === Register.rdx)) {
+              score += 2; // multiply operand already in rdx
+            }
             break;
           }
         }
@@ -618,7 +615,7 @@ export class Model {
     });
 
     // Pick among the highest-scored candidates
-    const maxScore = scored.reduce((max, s) => (s.score > max ? s.score : max), 0);
+    const maxScore = scored.reduce((max, s) => (s.score > max ? s.score : max), -Number.MAX_VALUE);
     const best = scored.filter((s) => s.score === maxScore);
     const chosen = best[0];
 

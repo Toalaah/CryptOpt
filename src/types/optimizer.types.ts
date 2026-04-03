@@ -70,6 +70,7 @@ export type OptimizerArgs = {
   framePointer: FRAME_POINTER_OPTIONS_T;
   memoryConstraints: MEMORY_CONSTRAINTS_OPTIONS_T;
   dynamicOperationOrdering: boolean;
+  registerPressureThresh: number;
 };
 
 export type AssemblerArgs = Pick<OptimizerArgs, "dynamicOperationOrdering">;

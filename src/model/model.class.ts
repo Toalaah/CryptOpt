@@ -178,8 +178,12 @@ export class Model {
   }
 
   // for debugging
-  public static get order(): string {
+  public static get orderStr(): string {
     return JSON.stringify(Model._order);
+  }
+
+  public static get order() {
+    return cloneDeep(Model._order);
   }
 
   private static _currentInstIdx = -1;

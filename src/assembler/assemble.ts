@@ -70,7 +70,7 @@ export class Assembler {
           failfile,
           output
             .map((i) => `\t${i}`)
-            .concat(Model.order)
+            .concat(Model.orderStr)
             .concat(`ErrorStack: ${e instanceof Error ? e.stack : JSON.stringify(e)}`)
             .join("\n") + `while doing ${JSON.stringify(curOp, undefined, 2)}`,
         );

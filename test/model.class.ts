@@ -166,7 +166,7 @@ describe("Model.class", () => {
     });
 
     function getOrderSnapshot(): string {
-      return Model.order;
+      return Model.orderStr;
     }
 
     function getNodeNames(): string {

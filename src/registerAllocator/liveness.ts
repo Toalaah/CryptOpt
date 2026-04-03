@@ -17,7 +17,11 @@ function defSetForNode(node: CryptOpt.StringOperation): Set<string> {
   return s;
 }
 
-function useSetForNode(node: CryptOpt.StringOperation, lookupMap: ReadonlyMap<string, number>): Set<string> {
+function useSetForNode(
+  node: CryptOpt.StringOperation,
+  lookupMap: ReadonlyMap<string, number>,
+  u128Names: ReadonlySet<string>,
+): Set<string> {
   const s = new Set<string>();
   for (const arg of node.arguments) {
     const str = arg as string;
@@ -27,7 +31,17 @@ function useSetForNode(node: CryptOpt.StringOperation, lookupMap: ReadonlyMap<st
       s.add(argMatch.groups.base);
       continue;
     }
-    if (matchXD(str) || lookupMap.has(str)) s.add(str);
+    if (matchXD(str) || lookupMap.has(str)) {
+      // XXX: u128 variables are tracked on limb basis in def sets. Need to expand the bare u128 name
+      // to its two limbs so that the backwards pass can correctly kill the variable at its
+      // definition point instead of propogating it to the start of the program.
+      if (u128Names.has(str)) {
+        s.add(`${str}_0`);
+        s.add(`${str}_1`);
+      } else {
+        s.add(str);
+      }
+    }
   }
   // Memory-destination names like "out1[n]" require the base pointer (out1)
   // to be live, even though it appears in node.name rather than node.arguments.
@@ -91,8 +105,21 @@ export class LivenessAnalyzer {
     const nodeCount = nodes.length;
     if (nodeCount === 0) return { liveIn: [], liveOut: [] };
 
+    // Collect the bare names of all u128 nodes.  Arguments that reference a
+    // u128 variable appear as the base name (e.g. "x10004") in node.arguments,
+    // but def sets track the two individual limbs ("x10004_0", "x10004_1").
+    // We pass this set to useSetForNode so it can expand u128 names to limbs,
+    // keeping def and use consistent and preventing a "never-killed" variable
+    // from being propagated back to the start of the program.
+    const u128Names = new Set<string>();
+    for (const node of nodes) {
+      if (node.datatype === "u128") {
+        for (const nm of node.name) u128Names.add(nm as string);
+      }
+    }
+
     const def = nodes.map(defSetForNode);
-    const use = nodes.map((nd) => useSetForNode(nd, lookupMap));
+    const use = nodes.map((nd) => useSetForNode(nd, lookupMap, u128Names));
 
     const liveIn: Set<string>[] = Array.from({ length: nodeCount }, () => new Set<string>());
     const liveOut: Set<string>[] = Array.from({ length: nodeCount }, () => new Set<string>());

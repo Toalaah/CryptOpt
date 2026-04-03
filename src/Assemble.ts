@@ -26,7 +26,7 @@ import { resolve } from "path";
 let parsedArgs = parsedArgsFromCli;
 const dynamicOperationOrdering = parsedArgs.dynamicOperationOrdering;
 if (!parsedArgs.readState) {
-  console.error(`Must pass state file to assemble with --readState\n`);
+  console.error(`Must pass state file to assemble with --readState`);
   process.exit(1);
 }
 

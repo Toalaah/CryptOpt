@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+a="$1"
+b="$2"
+
+cycle_counts=$(taskset -c 0 ms -n 100 -b 100 "$a" "$b" -c | jq '.cycles' -c)
+
+python3 - "$cycle_counts" <<EOF
+import sys
+import json
+import statistics
+d = json.loads(sys.argv[1])
+a="$a"
+b="$b"
+
+def print_stats(name, i):
+	mean = statistics.mean(d[i])
+	stdev = statistics.stdev(d[i])
+	print(f'{name}: {mean} σ={stdev}')
+	return mean
+
+cycles = []
+for i, name in enumerate([a,b]):
+	cycles.append(print_stats(name, i))
+
+print(f'Speedup: {cycles[0]/cycles[1]}')
+EOF

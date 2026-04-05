@@ -19,7 +19,6 @@ import { Logger } from "@/helper/Logger.class";
 import { Paul, sha1Hash } from "@/paul";
 import { existsSync, rmSync } from "fs";
 import { Measuresuite } from "measuresuite";
-import { tmpdir } from "os";
 import { join } from "path";
 import { init } from "./helpers";
 import { Model } from "@/model";
@@ -29,6 +28,7 @@ import { RegisterAllocator } from "@/registerAllocator";
 import { errorOut, ERRORS } from "@/errors";
 import { writeString } from "@/helper";
 import { createHash } from "crypto";
+import { Objective, ObjectiveFactory } from "./objective";
 
 export type OptimizerResult = {
   ratio: number;
@@ -51,10 +51,10 @@ export type MutationStats = {
 };
 
 export abstract class Optimizer {
-  protected symbolname: string;
   protected no_of_instructions: number;
   protected libcheckfunctionDirectory: string;
-  protected measuresuite: Measuresuite;
+  protected symbolname: string;
+  protected objective: Objective;
   protected mutationStats: MutationStats;
 
   protected asmStrings: { [k in FUNCTIONS]: string } = {
@@ -107,11 +107,9 @@ export abstract class Optimizer {
   public constructor(protected args: OptimizerArgs) {
     const { seed } = args;
     Paul.seed = seed;
-    const randomString = sha1Hash(Math.ceil(Date.now() * Math.random())).toString(36);
-    this.libcheckfunctionDirectory = join(args.cacheDir, "CryptOpt.cache", randomString);
-    const { measuresuite, symbolname } = init(this.libcheckfunctionDirectory, args);
-    this.measuresuite = measuresuite;
-    this.symbolname = symbolname;
+    this.objective = ObjectiveFactory.make(args);
+    this.libcheckfunctionDirectory = this.objective.getLibcheckfunctionDirectory();
+    this.symbolname = this.objective.getSymbolname();
     this.asmHashes = new Set<string>();
 
     this.mutationStats = {
@@ -159,23 +157,7 @@ export abstract class Optimizer {
   }
 
   public getSymbolname(deleteCache: boolean = false) {
-    if (deleteCache) {
-      this.cleanLibcheckfunctions();
-    }
-    return this.symbolname;
-  }
-
-  protected cleanLibcheckfunctions() {
-    if (existsSync(this.libcheckfunctionDirectory)) {
-      try {
-        Logger.log(`Removing lib check functions in '${this.libcheckfunctionDirectory}'`);
-        rmSync(this.libcheckfunctionDirectory, { recursive: true });
-        Logger.log(`removed ${this.libcheckfunctionDirectory}`);
-      } catch (e) {
-        console.error(e);
-        throw e;
-      }
-    }
+    return this.objective.getSymbolname(deleteCache);
   }
 
   protected revertFunction = (): void => {};

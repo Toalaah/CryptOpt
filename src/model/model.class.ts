@@ -597,20 +597,46 @@ export class Model {
 
     // Now to score the eligible candidates.
     const registers = new Set<string>(Object.values(Register));
+
+    // Build a set of node indices already issued (positions 0..currentPos-1).
+    const issuedNodeIndices = new Set<number>();
+    for (let i = 0; i < currentPos; i++) {
+      issuedNodeIndices.add(Model._order[i]);
+    }
+
     const scored = schedulable.map((p) => {
-      const node = Model._nodes[Model._order[p]];
-      const numOut = node.name.length;
-      let score = 2 - numOut;
+      const pNodeIdx = Model._order[p];
+      const node = Model._nodes[pNodeIdx];
+      let score = 0;
       for (const arg of node.arguments) {
         // Check arg and all its limb variants ("x5" -> ["x5", "x5_0", "x5_1"])
         const limbs = [arg, ...limbify(arg)];
         for (const variant of limbs) {
           const alloc = allocs[variant];
           if (alloc && "store" in alloc && alloc.store != null && registers.has(alloc.store as string)) {
-            score += 1;
+            score += 1; // argument is live in a GP register
             if (node.operation === "*" || (node.operation === "mulx" && alloc.store === Register.rdx)) {
-              score += 2; // multiply operand already in rdx
+              score += 1; // multiply operand already in rdx
             }
+
+            // If this node is the last consumer of this arg, the GP register will be freed.
+            // Check that every consumer of arg (and its relevant limbs) is either already
+            // issued or is the current node itself.
+            const isLastConsumer = [variant].every((v) => {
+              const consumers = Model._neededBy.get(v);
+              if (!consumers) return true; // nothing else needs this variant
+              return [...consumers].every((consumerName) => {
+                const consumerIdx = Model._nodeLookupMap.get(consumerName);
+                return (
+                  consumerIdx === undefined || consumerIdx === pNodeIdx || issuedNodeIndices.has(consumerIdx)
+                );
+              });
+            });
+            if (isLastConsumer) {
+              score += 1;
+            }
+            // process.stderr.write(`Alloc=${JSON.stringify(alloc)}, arg=${arg}, score=${score}\n`);
+            // count each argument at most once
             break;
           }
         }

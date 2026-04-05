@@ -57,9 +57,7 @@ const stateFile = JSON.parse(fs.readFileSync(args.readState).toString()) as Cryp
 const { parsedArgs } = stateFile;
 const { bridge, memoryConstraints } = parsedArgs;
 
-// Model.init() must be called before Model.restore() so that _methodParameters
-// is non-empty (getInstance() guards on this). restoreFromFile would override
-// _nodes/_order anyway, so we only need the function shape here.
+// Need to init model first.
 switch (bridge) {
   case "fiat": {
     const { curve, method } = parsedArgs as { curve: string; method: string };

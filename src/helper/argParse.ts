@@ -41,6 +41,7 @@ import {
   SA_NEIGHBOR_STRATEGIES,
   SA_NEIGHBOR_STRATEGY_GREEDY,
   OPTIMIZER_STRATEGY_BIASED,
+  MEASURE_STRATEGY_OPTIONS,
 } from "@/types";
 import { tmpdir } from "node:os";
 
@@ -383,6 +384,12 @@ export const parsedArgs = y
     describe:
       "Defines if memory reads are contraint. 'none' will not enforce anything. All reads are permitted at any time. 'all' enforces that no read from any `argN[n]` happens after any write to `outN[n]`. 'out1-arg1' enforces that no read from arg1[n] is permitted after `out1[n]` has been written (essentially permits mul(r,r,x) and sq(a,a); but not if elemets overlap but not align. (e.g. mul(r+1,r,x)))",
     choices: MEMORY_CONSTRAINTS_OPTIONS,
+  })
+  .option("measureStrategy", {
+    default: "measuresuite",
+    string: true,
+    describe: "What measurement strategy to use for evaluating objective function",
+    choices: MEASURE_STRATEGY_OPTIONS,
   })
   .help("help")
   .alias("h", "help")

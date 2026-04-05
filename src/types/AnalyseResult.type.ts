@@ -39,7 +39,7 @@ export interface AnalyseResult {
   chunks: number[];
 
   correct: boolean;
-  rawResult: MeasureResult; // hopefully just for debug/dev purposes
+  rawResult?: MeasureResult; // hopefully just for debug/dev purposes
 }
 
 export interface AnalyseMeasureResultOptions {

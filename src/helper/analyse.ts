@@ -20,6 +20,7 @@ import * as Stats from "simple-statistics";
 
 import { errorOut, ERRORS } from "@/errors";
 import type { AnalyseMeasureResultOptions, AnalyseResult, MeasureResult, QuickStats } from "@/types";
+import { SummaryView } from "@/optimizer/objective";
 
 /**
  * @param result - the result to analyse
@@ -126,4 +127,37 @@ function createStatistics(arr: number[]): [pre: number[], post: number[]] {
   const q3 = Stats.quantile(arr, 0.75);
   const post = arr.filter((a) => a >= q1 - 1.5 * irq && a <= q3 + 1.5 * irq);
   return [arr, post];
+}
+
+export function analyseMeasureResult2(
+  result: SummaryView[] | null,
+  options: AnalyseMeasureResultOptions,
+): AnalyseResult {
+  // assign default values
+  defaults(options, { checkCorrectness: true });
+
+  if (!result) {
+    console.error("measure returned, but results is nullish. TSNH.");
+    errorOut(ERRORS.measureCannotAnalyze);
+  }
+  const scale = (cyc: number): number => cyc;
+  const rawMedian = result.map((v) => (v.TotaluOps * v.BlockRThroughput) / v.uOpsPerCycle);
+  const rawStddev = result.map((_) => 0);
+  const numOutliers = result.map((_) => 0);
+  return {
+    rawMedian,
+    rawStddev,
+    batchSizeScaledrawMedian: rawMedian.map(scale),
+    batchSizeScaledrawStddev: rawStddev.map(scale),
+
+    noOutlierMedian: rawMedian,
+    noOutlierStddev: rawStddev,
+    noOutlierBatchSizeScaledMedian: rawMedian.map(scale),
+    noOutlierBatchSizeScaledStddev: rawStddev.map(scale),
+
+    numOutliers,
+
+    chunks: result.map((_) => 0),
+    correct: true,
+  };
 }

@@ -132,9 +132,24 @@ export class FiatBridge implements Bridge {
     }
 
     // then we can compile from the c file.
-    const command = `${cc} ${CFLAGS} -fPIC -shared -o ${filename} ${cCacheFilename}`;
-    Logger.log(`cmd to generate machinecode: ${command}`);
-    lockAndRunOrReturn(filename, command, { shell: "/usr/bin/bash" });
+    const sharedObjectCommand = `${cc} ${CFLAGS} -fPIC -shared -o ${filename} ${cCacheFilename}`;
+    Logger.log(`cmd to generate machinecode: ${sharedObjectCommand}`);
+    lockAndRunOrReturn(filename, sharedObjectCommand, { shell: "/usr/bin/bash" });
+
+    const asmFlags = (() => {
+      switch (cc) {
+        case "gcc":
+          return "-S -masm=intel";
+        case "clang":
+          return "-S -mllvm --x86-asm-syntax=intel";
+        default:
+          throw new Error(`unknown CC: ${cc}`);
+      }
+    })();
+
+    const assemblyCommand = `${cc} ${CFLAGS} -fPIC -o ${filename.replace(".so", ".asm")} ${asmFlags} ${cCacheFilename}`;
+    Logger.log(`cmd to generate assembly: ${assemblyCommand}`);
+    lockAndRunOrReturn(filename, assemblyCommand, { shell: "/usr/bin/bash" });
 
     return methodname;
   }

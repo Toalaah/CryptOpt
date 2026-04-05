@@ -158,14 +158,15 @@ function createMS(
   };
 }
 
+export function makeSharedObjectFilename(args: neededArgs, extension: "asm" | "so" = "so") {
+  return `libcheckfunctions-s${args.seed}-b${args.bridge}-p${process.pid}.${extension}`;
+}
+
 export function init(tmpDir: string, args: neededArgs): { symbolname: string; measuresuite: Measuresuite } {
   // Create temp directory for the so-files
   mkdirSync(tmpDir, { recursive: true });
 
-  const sharedObjectFilename = resolve(
-    tmpDir,
-    `libcheckfunctions-s${args.seed}-b${args.bridge}-p${process.pid}.so`,
-  );
+  const sharedObjectFilename = resolve(tmpDir, makeSharedObjectFilename(args));
 
   let r: ret;
   switch (args.bridge) {

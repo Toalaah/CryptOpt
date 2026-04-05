@@ -23,7 +23,6 @@ import { FiatBridge } from "@/bridge/fiat-bridge";
 import { FUNCTIONS } from "@/enums";
 import { errorOut, ERRORS } from "@/errors";
 import {
-  analyseMeasureResult,
   generateResultFilename,
   LOG_EVERY,
   padSeed,
@@ -51,11 +50,9 @@ export class RLSOptimizer extends Optimizer {
       Logger.log("starting rls optimisation");
       printStartInfo({
         ...this.args,
-        symbolname: this.symbolname,
-        counter: this.measuresuite.timer,
+        symbolname: this.objective.getSymbolname(),
+        counter: this.objective.getCounter(),
       });
-      let batchSize = 200;
-      const numBatches = 31;
       let ratioString = "";
       let numEvals = 0;
 
@@ -127,14 +124,11 @@ export class RLSOptimizer extends Optimizer {
             }
             // here we need the barriers
             const now_measure = Date.now();
-            const results = this.measuresuite.measure(batchSize, numBatches, [
+            analyseResult = this.objective.measure([
               this.asmStrings[FUNCTIONS.F_A],
               this.asmStrings[FUNCTIONS.F_B],
             ]);
             accumulatedTimeSpentByMeasuring += Date.now() - now_measure;
-            Logger.log("well done guys. The results are in!");
-
-            analyseResult = analyseMeasureResult(results, { batchSize, resultDir: this.args.resultDir });
 
             //TODO increase numBatches, if the times have a big stddeviation
             //TODO change batchSize if the avg number is batchSize *= avg(times)/goal ; goal=10000 cycles
@@ -170,11 +164,6 @@ export class RLSOptimizer extends Optimizer {
           }
 
           const [meanrawA, meanrawB, meanrawCheck] = analyseResult.rawMedian;
-
-          batchSize = Math.ceil((Number(this.args.cyclegoal) / meanrawCheck) * batchSize);
-          // We want to limit for some corner cases.
-          batchSize = Math.min(batchSize, 10000);
-          batchSize = Math.max(batchSize, 5);
 
           const currentFunctionIsA = () => currentNameOfTheFunctionThatHasTheMutation === FUNCTIONS.F_A;
 
@@ -255,6 +244,8 @@ export class RLSOptimizer extends Optimizer {
           }
 
           const choice = this.choice;
+          const batchSize = this.objective.batchSize;
+          const numBatches = this.objective.numBatches;
           logMutation({ choice, kept, wasNewCandidate, numEvals, epoch: currentEpoch, ratio: currentRatio });
           if (numEvals % PRINT_EVERY == 0) {
             // print every 10th eval
@@ -306,7 +297,7 @@ export class RLSOptimizer extends Optimizer {
               acc: accumulatedTimeSpentByMeasuring,
               numRevert: this.mutationStats.numRevert,
               numMut: this.mutationStats.numMut,
-              counter: this.measuresuite.timer,
+              counter: this.objective.getCounter(),
               framePointer: this.args.framePointer,
               memoryConstraints: this.args.memoryConstraints,
               cyclegoal: this.args.cyclegoal,
@@ -349,10 +340,7 @@ export class RLSOptimizer extends Optimizer {
               }
             }
             Logger.log("done with that current price of assembly code.");
-            this.cleanLibcheckfunctions();
-            const v = this.measuresuite.destroy();
-            Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
-
+            this.objective.cleanup();
             resolve({
               ratio: currentRatio,
               cycleCount: currentCycleCount,

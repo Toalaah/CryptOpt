@@ -23,6 +23,7 @@ import {
   OPTIMIZER_STRATEGY_T,
   SA_NEIGHBOR_STRATEGY_T,
   SA_COOLING_SCHEDULE_T,
+  MEASURE_STRATEGY_OPTIONS_T,
 } from "@/types";
 
 export type OptimizerArgs = {
@@ -71,6 +72,7 @@ export type OptimizerArgs = {
   memoryConstraints: MEMORY_CONSTRAINTS_OPTIONS_T;
   dynamicOperationOrdering: boolean;
   registerPressureThresh: number;
+  measureStrategy: MEASURE_STRATEGY_OPTIONS_T;
 };
 
 export type AssemblerArgs = Pick<OptimizerArgs, "dynamicOperationOrdering">;

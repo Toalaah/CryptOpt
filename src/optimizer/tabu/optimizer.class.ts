@@ -42,18 +42,9 @@ import { Paul } from "@/paul";
 
 export class TabuOptimizer extends Optimizer {
   private uniquenessGoal: number;
-  private msOpts: { batchSize: number; numBatches: number };
   public constructor(args: OptimizerArgs) {
     super(args);
     this.uniquenessGoal = this.args.tabuUniqueFactorGoal;
-
-    this.msOpts = { batchSize: 200, numBatches: 31 };
-  }
-
-  private updateBatchSize(meanRaw: number) {
-    this.msOpts.batchSize = Math.ceil((Number(this.args.cyclegoal) / meanRaw) * this.msOpts.batchSize);
-    this.msOpts.batchSize = Math.min(this.msOpts.batchSize, 10000);
-    this.msOpts.batchSize = Math.max(this.msOpts.batchSize, 5);
   }
 
   public optimise() {
@@ -151,8 +142,8 @@ export class TabuOptimizer extends Optimizer {
       let time = Date.now();
       printStartInfo({
         ...this.args,
-        symbolname: this.symbolname,
-        counter: this.measuresuite.timer,
+        symbolname: this.objective.getSymbolname(),
+        counter: this.objective.getCounter(),
       });
 
       // Before running the optimization loop, assemble the baseline program (at this point, no mutations have taken place).
@@ -190,27 +181,20 @@ export class TabuOptimizer extends Optimizer {
                 ),
               );
             const now_measure = Date.now();
-            const results = this.measuresuite.measure(
-              this.msOpts.batchSize,
-              this.msOpts.numBatches,
-              candidates.map((c) => c.asm),
-            );
+            const analyseResult = this.objective.measure(candidates.map((c) => c.asm));
             accumulatedTimeSpentByMeasuring += Date.now() - now_measure;
-            return analyseMeasureResult(results, {
-              batchSize: this.msOpts.batchSize,
-              resultDir: this.args.resultDir,
-            });
+            return analyseResult;
           } catch (e) {
             this.handleMeasurementError(e);
           }
         })();
 
+        const batchSize = this.objective.batchSize;
+        const numBatches = this.objective.numBatches;
+
         const meanrawCurrent = analyseResult.rawMedian[CURRENT_FUNCTION];
         const meanrawCandidate = analyseResult.rawMedian[CANDIDATE_FUNCTION];
         const meanrawCheck = analyseResult.rawMedian[CHECK];
-
-        // Update batch size & best result.
-        this.updateBatchSize(meanrawCheck);
 
         // Decide whether we want to keep mutated candidate.
         let kept: boolean;
@@ -306,7 +290,7 @@ export class TabuOptimizer extends Optimizer {
               logComment: this.args.logComment,
               analyseResult,
               badChunks,
-              batchSize: this.msOpts.batchSize,
+              batchSize,
               choice: this.choice,
               goodChunks,
               indexBad,
@@ -345,17 +329,18 @@ export class TabuOptimizer extends Optimizer {
             this.mutationStats.avgMutStepSize =
               (this.mutationStats.numMut.decision + this.mutationStats.numMut.permutation) / numEvals;
 
+            const counter = this.objective.getCounter();
             statistics = genStatistics({
               paddedSeed,
               ratioString,
               evals: this.args.evals,
               elapsed,
-              batchSize: this.msOpts.batchSize,
-              numBatches: this.msOpts.numBatches,
+              batchSize,
+              numBatches,
               acc: accumulatedTimeSpentByMeasuring,
               numRevert: this.mutationStats.numRevert,
               numMut: this.mutationStats.numMut,
-              counter: this.measuresuite.timer,
+              counter,
               framePointer: this.args.framePointer,
               memoryConstraints: this.args.memoryConstraints,
               cyclegoal: this.args.cyclegoal,
@@ -398,9 +383,7 @@ export class TabuOptimizer extends Optimizer {
               }
             }
             Logger.log("done with that current price of assembly code.");
-            if (!this.args.verbose) this.cleanLibcheckfunctions();
-            const v = this.measuresuite.destroy();
-            Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
+            this.objective.cleanup();
             resolve({
               ratio: globals.currentRatio,
               cycleCount: currentCycleCount,

@@ -86,3 +86,25 @@ export function getDwordRegFromQwReg(reg: Register): DwordRegister {
   };
   return mapping[reg];
 }
+
+export function getQwRegFromDwordReg(reg: DwordRegister): Register {
+  const mapping: { [reg in DwordRegister]: Register } = {
+    [DwordRegister.eax]: Register.rax,
+    [DwordRegister.ebx]: Register.rbx,
+    [DwordRegister.ecx]: Register.rcx,
+    [DwordRegister.edx]: Register.rdx,
+    [DwordRegister.edi]: Register.rdi,
+    [DwordRegister.esi]: Register.rsi,
+    [DwordRegister.esp]: Register.rsp,
+    [DwordRegister.ebp]: Register.rbp,
+    [DwordRegister.r8d]: Register.r8,
+    [DwordRegister.r9d]: Register.r9,
+    [DwordRegister.r10d]: Register.r10,
+    [DwordRegister.r11d]: Register.r11,
+    [DwordRegister.r12d]: Register.r12,
+    [DwordRegister.r13d]: Register.r13,
+    [DwordRegister.r14d]: Register.r14,
+    [DwordRegister.r15d]: Register.r15,
+  };
+  return mapping[reg];
+}

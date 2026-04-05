@@ -26,6 +26,7 @@ import {
   Flags,
   FlagState,
   Register,
+  DwordRegister,
   XmmRegister,
 } from "@/enums";
 import { isByteRegister, isMem, isRegister, isXmmRegister, limbify, limbifyImm } from "@/helper";
@@ -792,6 +793,19 @@ describe("RegisterAllocator:", () => {
       const allocs = ra.getCurrentAllocations();
       expect(allocs).toHaveProperty("arg1");
       expect(() => ra.lazyMov("arg1[2]", "x5")).toThrowError();
+    });
+  });
+  describe("regPressure", () => {
+    it("should correctly calculate regiser pressure", () => {
+      (ra as MOCK_RA)._allocations = {
+        x1: { datatype: "u64", store: Register.rax },
+        x2: { datatype: "u64", store: Register.rdx },
+        x3: { datatype: "u64", store: "[ rsp + 0x08 ]" },
+        x4: { datatype: "u64", store: DwordRegister.ecx },
+      };
+      const pres = ra.getPressure();
+      const available_registers = 14;
+      expect(pres).toBe(3 / available_registers);
     });
   });
   describe("loadVarToReg", () => {

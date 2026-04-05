@@ -21,6 +21,7 @@ import {
   ByteRegister,
   C_DI_IMM,
   C_DI_SPILL_LOCATION,
+  DwordRegister,
   Flags,
   FlagState,
   Register,
@@ -41,6 +42,7 @@ import {
   delimbify,
   isByteRegister,
   isCallerSave,
+  isDwordRegister,
   isFlag,
   isImm,
   isMem,
@@ -61,7 +63,7 @@ import {
   zx,
 } from "@/helper/lamdas";
 import { Logger } from "@/helper/Logger.class";
-import { getByteRegFromQwReg, getQwRegFromByteReg } from "@/helper/reg-conversion";
+import { getByteRegFromQwReg, getQwRegFromByteReg, getQwRegFromDwordReg } from "@/helper/reg-conversion";
 import { Model } from "@/model";
 import { Paul } from "@/paul";
 import type {
@@ -107,6 +109,26 @@ export class RegisterAllocator {
   };
   private get availableRedzoneSize(): number {
     return RegisterAllocator._options?.redzone ? RED_ZONE_SIZE_IN_ELEMENTS : 0;
+  }
+
+  public getPressure(): number {
+    const ra = RegisterAllocator.getInstance();
+    const registers = new Set<Register>(ra._ALL_REGISTERS);
+    const normalizeRegister = (a: Allocation): Register => {
+      const store = a.store;
+      if (isByteRegister(store)) {
+        return getQwRegFromByteReg(store as ByteRegister);
+      }
+      if (isDwordRegister(store)) {
+        return getQwRegFromDwordReg(store as DwordRegister);
+      }
+      return store! as Register;
+    };
+    const n = Object.values(ra._allocations).reduce(
+      (acc, allocation) => acc + (registers.has(normalizeRegister(allocation)) ? 1 : 0),
+      0,
+    );
+    return n / registers.size;
   }
 
   public static getInstance(): RegisterAllocator {

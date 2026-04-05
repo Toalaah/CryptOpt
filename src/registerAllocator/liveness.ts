@@ -9,7 +9,7 @@ export interface LivenessInfo {
   liveOut: ReadonlyArray<ReadonlySet<string>>;
 }
 
-function defSetForNode(node: CryptOpt.StringOperation): Set<string> {
+export function defSetForNode(node: CryptOpt.StringOperation): Set<string> {
   const s = new Set<string>();
   for (const limb of makeU64NameLimbs(node)) {
     if (limb !== "_" && matchXD(limb)) s.add(limb);

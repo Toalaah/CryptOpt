@@ -33,17 +33,21 @@ import { JasminBridge } from "@/bridge/jasmin-bridge";
 import { ManualBridge } from "@/bridge/manual-bridge";
 import { isImm, makeU64NameLimbs, matchArg, matchXD } from "@/helper";
 import { Model } from "@/model";
-import { LivenessAnalyzer } from "@/registerAllocator/liveness";
+import { defSetForNode, LivenessAnalyzer } from "@/registerAllocator/liveness";
 import type { CryptOpt } from "@/types";
-import { buildInterferenceGraph } from "./registerAllocator/interferenceGraph";
 
 const args = yargs(process.argv.slice(2))
   .scriptName("./LivenessCheck")
-  .usage("$0 --readState <state-file>")
+  .usage("$0 --readState <state-file> [--rematerializeParams]")
   .option("readState", {
     string: true,
     describe: "Path to a JSON state file (to, body, parsedArgs) to load into the model.",
     demandOption: true,
+  })
+  .option("rematerializeParams", {
+    boolean: true,
+    default: false,
+    describe: "Exclude method parameters (arg1, arg2, out1) from liveness and register-pressure counts.",
   })
   .help("help")
   .alias("h", "help")
@@ -86,11 +90,18 @@ switch (bridge) {
 // Override _nodes and _order with the saved optimiser state.
 Model.restoreFromFile(args.readState);
 
+// Names of method parameters (arg1, arg2, out1).  Their values are always
+// available at known stack locations so they need not occupy a general-purpose
+// register.  When --rematerializeParams is set they are excluded from every
+// use set so the backward liveness pass never treats them as live.
+const paramNames: ReadonlySet<string> = args.rematerializeParams
+  ? new Set(Model.methodParameters.map((p) => p.name))
+  : new Set();
+
 const nodes = Model.nodesInTopologicalOrder;
-const livenessInfo = LivenessAnalyzer.computeLiveness();
+const livenessInfo = LivenessAnalyzer.computeLiveness(paramNames);
 const { liveIn, liveOut } = livenessInfo;
 
-// Collect all variables that appear in any liveIn/liveOut set.
 const allVars = new Set<string>();
 for (let i = 0; i < nodes.length; i++) {
   for (const v of liveIn[i]) allVars.add(v);
@@ -142,23 +153,24 @@ for (const v of [...allVars].sort()) {
   console.log(`${v.padEnd(maxVarLen, " ")}: ${bar}`);
 }
 
-const iGraph = buildInterferenceGraph(livenessInfo);
+// const iGraph = buildInterferenceGraph(livenessInfo);
+// console.log("\n=== Interference Graph ===");
+// const sortedNodes = [...iGraph.adj.keys()].sort();
+// for (const node of sortedNodes) {
+//   // When params are rematerializable they are not tracked as live, so they
+//   // have no meaningful interference edges and can be omitted from the display.
+//   if (paramNames.has(node)) continue;
+//   const neighborsAll = [...iGraph.adj.get(node)!].sort();
+//   const neighbors = neighborsAll.filter((nb) => !paramNames.has(nb)).join(", ");
+//   // Recompute degree excluding param neighbours for an accurate count.
+//   const degree = neighborsAll.filter((nb) => !paramNames.has(nb)).length;
+//   const precoloredLabel = iGraph.precolored.has(node)
+//     ? ` [precolored: ${iGraph.precoloredReg.get(node)}]`
+//     : "";
+//   console.log(`  ${node}${precoloredLabel} (degree ${degree}): {${neighbors}}`);
+// }
 
-console.log("\n=== Interference Graph ===");
-const sortedNodes = [...iGraph.adj.keys()].sort();
-for (const node of sortedNodes) {
-  const neighbors = [...iGraph.adj.get(node)!].sort().join(", ");
-  const degree = iGraph.degree.get(node)!;
-  const precoloredLabel = iGraph.precolored.has(node)
-    ? ` [precolored: ${iGraph.precoloredReg.get(node)}]`
-    : "";
-  console.log(`  ${node}${precoloredLabel} (degree ${degree}): {${neighbors}}`);
-}
-
-// ===================================================================
-// Pressure-Minimising Scheduler
-// ===================================================================
-//
+// Attempt pressure-minimising scheduling (the goal being to reduce spills)
 // Strategy: list scheduling that greedily minimises the net change in
 // register pressure at each step.  At position j, from the set of all
 // nodes whose data-flow predecessors have already been scheduled
@@ -166,26 +178,13 @@ for (const node of sortedNodes) {
 //
 //   delta = |born| - |freed|
 //
-// where
-//   born  = variables defined here that have at least one future consumer
-//   freed = variables used here whose LAST remaining consumer is this node
-//           (i.e. the variable dies here and its register is released)
+// Where born refers to variables defined at position j that have at least one future consumer, and freed variables used here whose LAST remaining consumer is this node (i.e. the variable dies here and its register is released)
 //
 // Ties are broken by the node's critical-path length (longest dependency
 // chain remaining): a longer chain means earlier scheduling is more
-// urgent (Sethi-Ullman heuristic).
+// urgent (i.e Sethi-Ullman heuristic).
 
-// Mirror the private helpers from liveness.ts so we can work with the
-// def/use sets independently of LivenessAnalyzer.
-function localDefSet(node: CryptOpt.StringOperation): Set<string> {
-  const s = new Set<string>();
-  for (const limb of makeU64NameLimbs(node)) {
-    if (limb !== "_" && matchXD(limb)) s.add(limb);
-  }
-  return s;
-}
-
-const schedLookup = Model.nodeLookupMap;
+const nodeLookupMap = Model.nodeLookupMap;
 
 // Same u128 expansion as in liveness.ts: bare u128 names in arguments must
 // be expanded to their two limb names so they match the def sets produced by
@@ -199,14 +198,14 @@ for (const nd of nodes) {
 
 function localUseSet(node: CryptOpt.StringOperation): Set<string> {
   const s = new Set<string>();
-  for (const arg of node.arguments as string[]) {
+  for (const arg of node.arguments) {
     if (isImm(arg)) continue;
     const m = matchArg(arg);
     if (m?.groups?.base) {
-      s.add(m.groups.base);
+      if (!paramNames.has(m.groups.base)) s.add(m.groups.base);
       continue;
     }
-    if (matchXD(arg) || schedLookup.has(arg)) {
+    if (matchXD(arg) || nodeLookupMap.has(arg)) {
       if (u128Names.has(arg)) {
         s.add(`${arg}_0`);
         s.add(`${arg}_1`);
@@ -218,16 +217,16 @@ function localUseSet(node: CryptOpt.StringOperation): Set<string> {
   // base pointers that appear in write destinations (e.g. out1[n])
   for (const nm of node.name) {
     const m = matchArg(nm as string);
-    if (m?.groups?.base) s.add(m.groups.base);
+    if (m?.groups?.base && !paramNames.has(m.groups.base)) s.add(m.groups.base);
   }
   return s;
 }
 
 // def[i] / use[i] are indexed by position in the original topological order.
-const def: Set<string>[] = nodes.map(localDefSet);
+const def: Set<string>[] = nodes.map(defSetForNode);
 const use: Set<string>[] = nodes.map(localUseSet);
 
-// defNode[v] = position i in `nodes` where v is defined (body nodes only).
+// defNode[v] = position i in nodes where v is defined (body nodes only).
 const defNode = new Map<string, number>();
 for (let i = 0; i < n; i++) {
   for (const v of def[i]) defNode.set(v, i);
@@ -296,8 +295,6 @@ const critPath: number[] = new Array(n).fill(0);
   }
 }
 
-// ---- List scheduling loop ----
-
 const inDeg = deps.map((d) => d.size);
 const readySet = new Set<number>();
 for (let i = 0; i < n; i++) {
@@ -327,14 +324,14 @@ while (minPressOrder.length < n) {
       if (!hasOther) freed++;
     }
 
-    // Variables born: defined here and actually consumed somewhere.
+    // variables born ~= defined here and actually consumed somewhere.
     let born = 0;
     for (const v of def[candidate]) {
       if ((consumers.get(v)?.size ?? 0) > 0) born++;
     }
 
     const delta = born - freed;
-    // Lower delta preferred; break ties by longer critical path.
+    // prefer lower delta, break ties by longer critical path.
     if (delta < bestDelta || (delta === bestDelta && critPath[candidate] > bestCrit)) {
       bestDelta = delta;
       bestCrit = critPath[candidate];
@@ -366,16 +363,14 @@ for (let p = n - 1; p >= 0; p--) {
   newLiveIn[p] = newIn;
 }
 
-// ---- Register-pressure profiles ----
+// register-pressure profiles
 
 const origPressure = Array.from({ length: n }, (_, i) => liveIn[i].size);
 const newPressure = Array.from({ length: n }, (_, i) => newLiveIn[i].size);
 const origMaxPressure = n > 0 ? Math.max(...origPressure) : 0;
 const newMaxPressure = n > 0 ? Math.max(...newPressure) : 0;
 
-// ---- Interference-edge count for both schedules ----
-// (Interference = two variables simultaneously live when one is being defined.)
-
+// interference-edge count for both schedules
 function buildIEdgeSet(order: number[], livOut: ReadonlyArray<ReadonlySet<string>>): Set<string> {
   const seen = new Set<string>();
   for (let p = 0; p < order.length; p++) {
@@ -454,9 +449,9 @@ console.log(`New order:\n ${JSON.stringify(newOrder)}`);
 // instructions where it is not used (bridging two usage clusters).
 // Splitting the live range at the start of such a gap — by spilling
 // immediately after the last use before the gap and reloading just
-// before the next use — eliminates all interference edges that cross
+// before the next use - eliminates all interference edges that cross
 // the gap without requiring an extra spill slot beyond what a simple
-// spill would cost.  Variables are ranked by (total_gap_length ×
+// spill would cost.  Variables are ranked by (total_gap_length *
 // interference_degree) to surface the highest-leverage opportunities.
 
 interface SplitCandidate {
@@ -514,7 +509,7 @@ if (splitCandidates.length === 0) {
   console.log("  None found (no long live ranges with gaps).");
 } else {
   console.log(
-    "  Variables ranked by (total gap length × interference degree).\n" +
+    "  Variables ranked by (total gap length * interference degree).\n" +
       "  Splitting at gap start frees a register across the gap without extra spill cost.\n",
   );
   for (const c of splitCandidates) {

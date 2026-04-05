@@ -157,7 +157,7 @@ export class Model {
     );
   }
 
-  public static get methodParametes(): methodParam[] {
+  public static get methodParameters(): methodParam[] {
     if (Model._methodParameters.length == 0) {
       throw new Error(`Not initialized. call Model.init()/Model.import first`);
     }

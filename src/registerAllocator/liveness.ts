@@ -21,6 +21,7 @@ function useSetForNode(
   node: CryptOpt.StringOperation,
   lookupMap: ReadonlyMap<string, number>,
   u128Names: ReadonlySet<string>,
+  rematerializable: ReadonlySet<string> = new Set(),
 ): Set<string> {
   const s = new Set<string>();
   for (const arg of node.arguments) {
@@ -28,13 +29,14 @@ function useSetForNode(
     if (isImm(str)) continue;
     const argMatch = matchArg(str);
     if (argMatch?.groups?.base) {
-      s.add(argMatch.groups.base);
+      // e.g. "arg1[0]" => base "arg1". Skip if caller-designated rematerializable.
+      if (!rematerializable.has(argMatch.groups.base)) s.add(argMatch.groups.base);
       continue;
     }
     if (matchXD(str) || lookupMap.has(str)) {
-      // XXX: u128 variables are tracked on limb basis in def sets. Need to expand the bare u128 name
+      // u128 variables are tracked on limb basis in def sets. Need to expand the bare u128 name
       // to its two limbs so that the backwards pass can correctly kill the variable at its
-      // definition point instead of propogating it to the start of the program.
+      // definition point instead of propagating it to the start of the program.
       if (u128Names.has(str)) {
         s.add(`${str}_0`);
         s.add(`${str}_1`);
@@ -47,7 +49,7 @@ function useSetForNode(
   // to be live, even though it appears in node.name rather than node.arguments.
   for (const nm of node.name) {
     const nmMatch = matchArg(nm as string);
-    if (nmMatch?.groups?.base) {
+    if (nmMatch?.groups?.base && !rematerializable.has(nmMatch.groups.base)) {
       s.add(nmMatch.groups.base);
     }
   }
@@ -99,7 +101,13 @@ function runBackwardPass(
 // Liveness analysis. Reads from Model and returns a fresh result.
 // TODO: cache repeated calls or if topo order did not change
 export class LivenessAnalyzer {
-  static computeLiveness(): LivenessInfo {
+  /**
+   * @param rematerializable  Optional set of variable base names (e.g. "arg1",
+   *   "out1") that are always re-materializable and should therefore not be
+   *   counted as live.  They are excluded from every use set so the backward
+   *   pass never treats them as occupying a register.
+   */
+  static computeLiveness(rematerializable: ReadonlySet<string> = new Set()): LivenessInfo {
     const nodes = Model.nodesInTopologicalOrder;
     const lookupMap = Model.nodeLookupMap;
     const nodeCount = nodes.length;
@@ -119,7 +127,7 @@ export class LivenessAnalyzer {
     }
 
     const def = nodes.map(defSetForNode);
-    const use = nodes.map((nd) => useSetForNode(nd, lookupMap, u128Names));
+    const use = nodes.map((nd) => useSetForNode(nd, lookupMap, u128Names, rematerializable));
 
     const liveIn: Set<string>[] = Array.from({ length: nodeCount }, () => new Set<string>());
     const liveOut: Set<string>[] = Array.from({ length: nodeCount }, () => new Set<string>());

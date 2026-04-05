@@ -140,7 +140,7 @@ export class RegisterAllocator {
     // this loop initializes the 'allocations'-member field to the arguments which have been passed to the method.
     // Other Registers are considered `empty` and will be overwritten (callersave are pushed / popped to/from stack)
     Logger.log("setting up args in calling convention to registers");
-    Model.methodParametes.map(({ name, datatype }) => {
+    Model.methodParameters.map(({ name, datatype }) => {
       const reg = _CALLING_CONVENTION_REGISTER_ORDER.shift();
       if (!reg) {
         throw new Error(

@@ -56,7 +56,7 @@ export function buildInterferenceGraph(liveness: LivenessInfo): InterferenceGrap
   // Register method-parameter base pointers as precolored nodes.
   // Convention: returns params come first, then argument params (see Model).
   const ccRegs = [...CALLING_CONVENTION_REGISTER_ORDER];
-  for (const param of Model.methodParametes) {
+  for (const param of Model.methodParameters) {
     const reg = ccRegs.shift();
     if (!reg) break;
     graph.precolored.add(param.name);

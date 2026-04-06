@@ -21,7 +21,7 @@ import { init, makeSharedObjectFilename } from "./helpers";
 import { sha1Hash } from "@/paul";
 import { errorOut, ERRORS } from "@/errors";
 import { analyseMeasureResult, analyseMeasureResult2 } from "@/helper";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, rmSync } from "fs";
 import { spawnSync } from "child_process";
 import { Logger } from "@/helper/Logger.class";
 

@@ -78,7 +78,7 @@ export class Assembler {
       }
       RegisterAllocator.getInstance().clearOrphans();
     }
-    if (!!Assembler._options?.dynamicOperationOrdering) Model.finalize();
+    // if (!!Assembler._options?.dynamicOperationOrdering) Model.finalize();
     const { pre, post, stacklength } = ra.finalize();
     const code = pre.concat(output).concat(post);
 

@@ -557,14 +557,13 @@ export class Model {
    * Returns next instruction dynamically based upon current register allocs
    */
   public static nextOperationDynamic(): CryptOpt.StringOperation | null {
-    if (Model._currentInstIdx == -1) return this.nextOperation(); // Always initially return operation as we would in nextOperation().
     if (Model._currentInstIdx >= Model._order.length) return null;
 
-    const allocs = RegisterAllocator.getInstance().getCurrentAllocations();
     const currentPos = ++Model._currentInstIdx;
 
     if (currentPos >= Model._order.length) return null;
 
+    const allocs = RegisterAllocator.getInstance().getCurrentAllocations();
     // Find all schedulable nodes among positions [currentPos,n-1].
     const schedulable: number[] = [];
     outer: for (let p = currentPos; p < Model._order.length; p++) {
@@ -602,28 +601,11 @@ export class Model {
         for (const variant of limbs) {
           const alloc = allocs[variant];
           if (alloc && "store" in alloc && alloc.store != null && registers.has(alloc.store as string)) {
-            score += 1; // argument is live in a GP register
-            if (node.operation === "*" || (node.operation === "mulx" && alloc.store === Register.rdx)) {
-              score += 1; // multiply operand already in rdx
+            if ((node.operation === "*" || node.operation === "mulx") && alloc.store === Register.rdx) {
+              score += 2; // multiply operand already in rdx
+            } else {
+              score += 1; // argument is live in a GP register
             }
-
-            // If this node is the last consumer of this arg, the GP register will be freed.
-            // Check that every consumer of arg (and its relevant limbs) is either already
-            // issued or is the current node itself.
-            const isLastConsumer = [variant].every((v) => {
-              const consumers = Model._neededBy.get(v);
-              if (!consumers) return true; // nothing else needs this variant
-              return [...consumers].every((consumerName) => {
-                const consumerIdx = Model._nodeLookupMap.get(consumerName);
-                return (
-                  consumerIdx === undefined || consumerIdx === pNodeIdx || issuedNodeIndices.has(consumerIdx)
-                );
-              });
-            });
-            if (isLastConsumer) {
-              score += 1;
-            }
-            // process.stderr.write(`Alloc=${JSON.stringify(alloc)}, arg=${arg}, score=${score}\n`);
             // count each argument at most once
             break;
           }

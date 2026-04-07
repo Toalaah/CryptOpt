@@ -48,8 +48,15 @@ if (parsedArgs.resultDir == "") parsedArgs.resultDir = resolve(process.cwd(), "r
 // Set assembler options (uses original cli args, not those parsed from readState)
 Assembler.options = { dynamicOperationOrdering };
 
-OptimizerFactory.make(parsedArgs).getSymbolname(true);
+const symbolname = OptimizerFactory.make(parsedArgs).getSymbolname(true);
 
 Model.restore(stateFile);
 const { code } = Assembler.assemble(parsedArgs.resultDir);
-process.stdout.write(strip(code).join("\n"));
+process.stdout.write(
+  strip(["SECTION .text", `\tGLOBAL ${symbolname}`, `${symbolname}:`].concat(code)).join("\n"),
+);
+
+if (parsedArgsFromCli.writeState) {
+  process.stderr.write("Wrote state!\n");
+  Model.persist("assembled.json", parsedArgs);
+}

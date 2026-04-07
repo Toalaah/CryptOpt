@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { parsedArgs as parsedArgsFromCli } from "@/helper";
+import { makeArgs, parseArgs } from "@/helper";
 import { Model } from "@/model";
 
 import { Assembler, strip } from "./assembler";
@@ -22,6 +22,17 @@ import { OptimizerFactory } from "./optimizer";
 import { readFileSync } from "fs";
 import { CryptOpt } from "./types";
 import { resolve } from "path";
+
+const eargs = makeArgs().option("writeState", {
+  default: false,
+  boolean: true,
+  alias: "w",
+  describe: "Output state file after assembling",
+});
+
+const parsedArgsFromCli = parseArgs<{ writeState: boolean }>(eargs);
+
+console.log(JSON.stringify(parsedArgsFromCli));
 
 let parsedArgs = parsedArgsFromCli;
 const dynamicOperationOrdering = parsedArgs.dynamicOperationOrdering;

@@ -408,10 +408,6 @@ for (const edge of newIEdgeSet) {
   newInterfDegree.set(b, (newInterfDegree.get(b) ?? 0) + 1);
 }
 
-// ===================================================================
-// Output: pressure-minimising schedule
-// ===================================================================
-
 console.log("\n=== Pressure-Minimising Schedule ===");
 const pressWidth = Math.max(origMaxPressure, newMaxPressure).toString().length;
 const idxWidth = (n - 1).toString().length;

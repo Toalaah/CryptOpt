@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+a="$1"; shift
+b="$1"; shift
+
+symbolname=$(grep GLOBAL "$a"  | cut -d' ' -f2)
+cycle_count_a=$(taskset -c 0 CountCycles "$a" | cut -d ' ' -f1)
+cycle_count_b=$(taskset -c 0 CountCycles "$b" | cut -d ' ' -f1)
+
+python3 <<EOF
+a="$a"
+cycles_a=float($cycle_count_a)
+b="$b"
+cycles_b=float($cycle_count_b)
+print('Symbol: $symbolname')
+print(f'{a}: {cycles_a}')
+print(f'{b}: {cycles_b}')
+# print(f'Speedup: $b is {cycles_a/cycles_b} times faster than $a')
+print(f'Speedup: {cycles_a/cycles_b}')
+EOF

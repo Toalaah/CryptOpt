@@ -5,7 +5,7 @@ set -eou pipefail
 a="$1"; shift
 b="$1"; shift
 
-cycle_counts=$(taskset -c 0 ms -n 100 -b 100 "$a" "$b" -c "$@" | jq '.cycles' -c)
+cycle_counts=$(taskset -c 0 ms "$a" "$b" -c "$@" | jq '.cycles' -c)
 
 python3 - "$cycle_counts" <<EOF
 import sys

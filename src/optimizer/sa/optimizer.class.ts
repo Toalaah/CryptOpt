@@ -28,8 +28,6 @@ import { cauchy } from "@/paul/distributions";
 export class SAOptimizer extends Optimizer {
   // Number of iterations to perform during optimization.
   private nIter: number;
-  // MeasureSuite options.
-  private msOpts: { batchSize: number; numBatches: number };
   // Optimizer-specific args
   private initialTemperature: number;
   private reAnnealRatio: number;
@@ -49,7 +47,6 @@ export class SAOptimizer extends Optimizer {
     super(args);
 
     this.nIter = this.args.evals;
-    this.msOpts = { batchSize: 200, numBatches: 31 };
 
     this.initialTemperature = this.args.saInitialTemperature;
     if (this.initialTemperature <= 0) {
@@ -134,12 +131,6 @@ export class SAOptimizer extends Optimizer {
   // Likely we will never have to make crazy adjustments here, but we still use this identity function to make potential future refactoring easy.
   private energy(x: number): number {
     return x;
-  }
-
-  private updateBatchSize(meanRaw: number) {
-    this.msOpts.batchSize = Math.ceil((Number(this.args.cyclegoal) / meanRaw) * this.msOpts.batchSize);
-    this.msOpts.batchSize = Math.min(this.msOpts.batchSize, 10000);
-    this.msOpts.batchSize = Math.max(this.msOpts.batchSize, 5);
   }
 
   public optimise() {
@@ -284,7 +275,7 @@ export class SAOptimizer extends Optimizer {
       printStartInfo({
         ...this.args,
         symbolname: this.symbolname,
-        counter: this.measuresuite.timer,
+        counter: this.objective.getCounter(),
       });
 
       // Before running the optimization loop, assemble the baseline program (at this point, no mutations have taken place).
@@ -329,17 +320,10 @@ export class SAOptimizer extends Optimizer {
               );
             FileLogger.log("comparing candidates");
             const now_measure = Date.now();
-            const results = this.measuresuite.measure(
-              this.msOpts.batchSize,
-              this.msOpts.numBatches,
-              candidates.map((c) => c.asm),
-            );
+            const result = this.objective.measure(candidates.map((c) => c.asm));
             accumulatedTimeSpentByMeasuring += Date.now() - now_measure;
             FileLogger.log("done with measurements for current iteration");
-            return analyseMeasureResult(results, {
-              batchSize: this.msOpts.batchSize,
-              resultDir: this.args.resultDir,
-            });
+            return result;
           } catch (e) {
             this.handleMeasurementError(e);
           }
@@ -355,8 +339,6 @@ export class SAOptimizer extends Optimizer {
         const meanrawCheck = analyseResult.rawMedian[analyseResult.rawMedian.length - 1];
 
         let didSeeBest = false;
-        // Update batch size & best result.
-        this.updateBatchSize(meanrawCheck);
         for (let i = 0; i < analyseResult.rawMedian.length - 1; ++i) {
           const res = analyseResult.rawMedian[i];
           const ratio = meanrawCheck / res;
@@ -464,7 +446,7 @@ export class SAOptimizer extends Optimizer {
               logComment: this.args.logComment + ` temp=${temperature.toFixed(2)}`,
               analyseResult,
               badChunks,
-              batchSize: this.msOpts.batchSize,
+              batchSize: this.objective.batchSize,
               choice: this.choice,
               goodChunks,
               indexBad,
@@ -518,17 +500,20 @@ export class SAOptimizer extends Optimizer {
             this.mutationStats.avgMutStepSize =
               (this.mutationStats.numMut.decision + this.mutationStats.numMut.permutation) / currentEpoch;
 
+            const numBatches = this.objective.numBatches;
+            const batchSize = this.objective.batchSize;
+            const counter = this.objective.getCounter();
             statistics = genStatistics({
               paddedSeed,
               ratioString,
               evals: this.nIter,
               elapsed,
-              batchSize: this.msOpts.batchSize,
-              numBatches: this.msOpts.numBatches,
+              batchSize,
+              numBatches,
               acc: accumulatedTimeSpentByMeasuring,
               numRevert: this.mutationStats.numRevert,
               numMut: this.mutationStats.numMut,
-              counter: this.measuresuite.timer,
+              counter,
               framePointer: this.args.framePointer,
               memoryConstraints: this.args.memoryConstraints,
               cyclegoal: this.args.cyclegoal,
@@ -595,9 +580,7 @@ export class SAOptimizer extends Optimizer {
                 }
               }
               Logger.log("done with that current price of assembly code.");
-              if (!this.args.verbose) this.cleanLibcheckfunctions();
-              const v = this.measuresuite.destroy();
-              Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
+              this.objective.cleanup();
               resolve({
                 ratio: finalRatio,
                 cycleCount: finalCycle,

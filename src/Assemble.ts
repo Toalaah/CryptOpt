@@ -32,8 +32,6 @@ const eargs = makeArgs().option("writeState", {
 
 const parsedArgsFromCli = parseArgs<{ writeState: boolean }>(eargs);
 
-console.log(JSON.stringify(parsedArgsFromCli));
-
 let parsedArgs = parsedArgsFromCli;
 const dynamicOperationOrdering = parsedArgs.dynamicOperationOrdering;
 if (!parsedArgs.readState) {

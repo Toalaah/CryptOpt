@@ -176,7 +176,9 @@ for (const v of [...allVars].sort()) {
 //
 //   delta = |born| - |freed|
 //
-// Where born refers to variables defined at position j that have at least one future consumer, and freed variables used here whose LAST remaining consumer is this node (i.e. the variable dies here and its register is released)
+// Where born refers to variables defined at position j that have at least one future
+// consumer, and freed variables used here whose LAST remaining consumer is this node
+// (i.e. the variable dies here and its register is released).
 //
 // Ties are broken by the node's critical-path length (longest dependency
 // chain remaining): a longer chain means earlier scheduling is more

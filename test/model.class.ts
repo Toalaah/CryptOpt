@@ -25,6 +25,7 @@ describe("Model.class", () => {
   const body = createModelHelpers().nodes;
   Model.init({
     memoryConstraints: "none",
+    schedulingAlgorithm: "default",
     json: {
       operation: "mul",
       arguments: [

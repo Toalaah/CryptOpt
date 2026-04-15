@@ -14,11 +14,14 @@
  * limitations under the License.
  */
 
-import { parsedArgs } from "@/helper";
+import { makeArgs, parseArgs } from "@/helper";
 import { Model } from "@/model";
 import { init } from "./optimizer/helpers";
 import { join } from "path";
 import { sha1Hash } from "./paul";
+
+const args = makeArgs();
+const parsedArgs = parseArgs(args);
 
 const randomString = sha1Hash(Math.ceil(Date.now() * Math.random())).toString(36);
 const libcheckfunctionDirectory = join(parsedArgs.cacheDir, "CryptOpt.cache", randomString);
@@ -28,6 +31,5 @@ const state = {
   ...Model.getState(),
   parsedArgs,
 };
-
 process.stdout.write(JSON.stringify(state, null, 2));
 process.stdout.write("\n");

@@ -24,6 +24,7 @@ import {
   SA_NEIGHBOR_STRATEGY_T,
   SA_COOLING_SCHEDULE_T,
   MEASURE_STRATEGY_OPTIONS_T,
+  SCHEDULING_ALGORITHM_OPTIONS_T,
 } from "@/types";
 
 export type OptimizerArgs = {
@@ -69,9 +70,9 @@ export type OptimizerArgs = {
   redzone: boolean;
   preferXmm?: boolean;
   framePointer: FRAME_POINTER_OPTIONS_T;
+  schedulingAlgorithm: SCHEDULING_ALGORITHM_OPTIONS_T;
   memoryConstraints: MEMORY_CONSTRAINTS_OPTIONS_T;
   dynamicOperationOrdering: boolean;
-  registerPressureThresh: number;
   measureStrategy: MEASURE_STRATEGY_OPTIONS_T;
 };
 

@@ -35,6 +35,9 @@ export type MEMORY_CONSTRAINTS_OPTIONS_T = (typeof MEMORY_CONSTRAINTS_OPTIONS)[n
 export const MEASURE_STRATEGY_OPTIONS = ["measuresuite", "llvm"] as const;
 export type MEASURE_STRATEGY_OPTIONS_T = (typeof MEASURE_STRATEGY_OPTIONS)[number];
 
+export const SCHEDULING_ALGORITHM_OPTIONS = ["default", "pressure-minimizing"] as const;
+export type SCHEDULING_ALGORITHM_OPTIONS_T = (typeof SCHEDULING_ALGORITHM_OPTIONS)[number];
+
 export const OPTIMIZER_STRATEGY_RLS = "rls";
 export const OPTIMIZER_STRATEGY_SA = "sa";
 export const OPTIMIZER_STRATEGY_TABU = "tabu";
@@ -158,7 +161,8 @@ export namespace CryptOpt {
   }
 
   export interface StringOperation
-    extends Omit<ArgumentWithStringNames, "arguments">, Omit<ArgumentWithStringArguments, "name"> {}
+    extends Omit<ArgumentWithStringNames, "arguments">,
+      Omit<ArgumentWithStringArguments, "name"> {}
 }
 export type Node = CryptOpt.StringOperation;
 export type Nodes = Node[];

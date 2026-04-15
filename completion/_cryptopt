@@ -46,6 +46,7 @@ _arguments -S -s \
     '(-b --bets -r --betRatio)--single[no bets. Short for --bets=1 --betRatio=1]:single:' \
     '(-b --bets)'{-b,--bets=}'[number of Bets]:bets:' \
     '(-r --betRatio)'{-r,--betRatio=}'[Ratio of how many evals to spend on bets.]:br:' \
+    '--schedulingAlgorithm=[Instruction scheduling algorithm to use when constructing initial model node order]:schedulingalgorithm:->schedulingalgorithms' \
     '--cyclegoal=[Number of cycles to measure, adjusts batch size dynamically]:cg:' \
     '--logComment=[Hint displayed during optimization]:lc:' \
     '--logFile=[Write to specified log file]:log_file:' \
@@ -91,6 +92,11 @@ case "$state" in
 			'exp[Exponential cooling schedule]' \
 			'lin[Linear cooling schedule]' \
 			'log[Logarithmic cooling schedule]' \
+		;;
+	schedulingalgorithms)
+		_values  'schedulingalgorithm' \
+			'default[Default algorithm (Kahn)]' \
+			'pressure-minimizing[Reorder in order to minimize register pressure]' \
 		;;
 	curves)
 		_values 'curve' \

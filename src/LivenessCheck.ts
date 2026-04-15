@@ -64,20 +64,33 @@ switch (bridge) {
     Model.init({
       memoryConstraints,
       json: new FiatBridge().getCryptOptFunction(method as never, curve as never),
+      schedulingAlgorithm: parsedArgs.schedulingAlgorithm,
     });
     break;
   }
   case "bitcoin-core": {
     const { method } = parsedArgs as { method: string };
-    Model.init({ memoryConstraints, json: new BitcoinCoreBridge().getCryptOptFunction(method as never) });
+    Model.init({
+      memoryConstraints,
+      json: new BitcoinCoreBridge().getCryptOptFunction(method as never),
+      schedulingAlgorithm: parsedArgs.schedulingAlgorithm,
+    });
     break;
   }
   case "jasmin":
-    Model.init({ memoryConstraints, json: new JasminBridge().getCryptOptFunction() });
+    Model.init({
+      memoryConstraints,
+      json: new JasminBridge().getCryptOptFunction(),
+      schedulingAlgorithm: parsedArgs.schedulingAlgorithm,
+    });
     break;
   case "manual": {
     const { jsonFile, cFile } = parsedArgs as { jsonFile: string; cFile: string };
-    Model.init({ memoryConstraints, json: new ManualBridge(jsonFile, cFile).getCryptOptFunction() });
+    Model.init({
+      memoryConstraints,
+      json: new ManualBridge(jsonFile, cFile).getCryptOptFunction(),
+      schedulingAlgorithm: parsedArgs.schedulingAlgorithm,
+    });
     break;
   }
   default:

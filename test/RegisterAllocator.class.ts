@@ -163,6 +163,7 @@ describe("RegisterAllocator:", () => {
       ] as CryptOpt.StringOperation[],
     },
     memoryConstraints: "none",
+    schedulingAlgorithm: 'default',
   });
   const ra = RegisterAllocator.getInstance();
   expect(ra).toBeTruthy();

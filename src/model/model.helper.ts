@@ -21,8 +21,11 @@ import {
   limbify,
   limbifyImm,
   makeU64NameLimbs,
+  matchArg,
+  matchXD,
   OUT_PREFIX,
 } from "@/helper";
+import { defSetForNode } from "@/registerAllocator/liveness";
 import type { CryptOpt, MEMORY_CONSTRAINTS_OPTIONS_T, Nodes } from "@/types";
 
 /**
@@ -298,4 +301,160 @@ function groupDepLimbs(
       return [[...workaround], [...workaround]];
     }
   }
+}
+
+function localUseSet(
+  nodeLookupMap: ReadonlyMap<string, number>,
+  nodes: Readonly<CryptOpt.StringOperation>[],
+  targetNode: CryptOpt.StringOperation,
+): Set<string> {
+  const u128Names = new Set<string>();
+  for (const nd of nodes) {
+    if (nd.datatype === "u128") {
+      for (const nm of nd.name) u128Names.add(nm as string);
+    }
+  }
+  const s = new Set<string>();
+  for (const arg of targetNode.arguments) {
+    if (isImm(arg)) continue;
+    const m = matchArg(arg);
+    if (m?.groups?.base) {
+      s.add(m.groups.base);
+      continue;
+    }
+    if (matchXD(arg) || nodeLookupMap.has(arg)) {
+      if (u128Names.has(arg)) {
+        s.add(`${arg}_0`);
+        s.add(`${arg}_1`);
+      } else {
+        s.add(arg);
+      }
+    }
+  }
+  for (const nm of targetNode.name) {
+    const m = matchArg(nm as string);
+    if (m?.groups?.base) s.add(m.groups.base);
+  }
+  return s;
+}
+
+export function reorderPressureMinimizing(
+  nodes: Readonly<CryptOpt.StringOperation>[],
+  nodeLookupMap: ReadonlyMap<string, number>,
+  order: Readonly<number>[],
+): number[] {
+  const n = nodes.length;
+  const def: Set<string>[] = nodes.map(defSetForNode);
+  const use: Set<string>[] = nodes.map((node) => localUseSet(nodeLookupMap, nodes, node));
+
+  const defNode = new Map<string, number>();
+  for (let i = 0; i < n; i++) {
+    for (const v of def[i]) defNode.set(v, i);
+  }
+
+  const consumers = new Map<string, Set<number>>();
+  for (let i = 0; i < n; i++) {
+    for (const v of use[i]) {
+      let s = consumers.get(v);
+      if (!s) {
+        s = new Set();
+        consumers.set(v, s);
+      }
+      s.add(i);
+    }
+  }
+
+  const deps: Set<number>[] = Array.from({ length: n }, () => new Set<number>());
+  const succs: Set<number>[] = Array.from({ length: n }, () => new Set<number>());
+  for (let i = 0; i < n; i++) {
+    for (const v of use[i]) {
+      const d = defNode.get(v);
+      if (d !== undefined && d !== i) {
+        deps[i].add(d);
+        succs[d].add(i);
+      }
+    }
+  }
+
+  const critPath: number[] = new Array(n).fill(0);
+  {
+    const visited = new Uint8Array(n);
+    const postOrder: number[] = [];
+    for (let start = 0; start < n; start++) {
+      if (visited[start]) continue;
+      const stack: Array<[number, Iterator<number>]> = [[start, succs[start][Symbol.iterator]()]];
+      visited[start] = 1;
+      while (stack.length > 0) {
+        const top = stack[stack.length - 1];
+        const { value: child, done } = top[1].next();
+        if (done) {
+          postOrder.push(top[0]);
+          stack.pop();
+        } else if (!visited[child]) {
+          visited[child] = 1;
+          stack.push([child, succs[child][Symbol.iterator]()]);
+        }
+      }
+    }
+    for (const i of postOrder) {
+      let maxSuccCrit = 0;
+      for (const s of succs[i]) {
+        if (critPath[s] > maxSuccCrit) maxSuccCrit = critPath[s];
+      }
+      critPath[i] = succs[i].size === 0 ? 0 : 1 + maxSuccCrit;
+    }
+  }
+
+  const inDeg = deps.map((d) => d.size);
+  const readySet = new Set<number>();
+  for (let i = 0; i < n; i++) {
+    if (inDeg[i] === 0) readySet.add(i);
+  }
+
+  const scheduledSet = new Set<number>();
+  const minPressOrder: number[] = [];
+  while (minPressOrder.length < n) {
+    let best = -1;
+    let bestDelta = Infinity;
+    let bestCrit = -1;
+    for (const candidate of readySet) {
+      let freed = 0;
+      for (const v of use[candidate]) {
+        const cons = consumers.get(v);
+        if (!cons) continue;
+        let hasOther = false;
+        for (const c of cons) {
+          if (c !== candidate && !scheduledSet.has(c)) {
+            hasOther = true;
+            break;
+          }
+        }
+        if (!hasOther) freed++;
+      }
+      let born = 0;
+      for (const v of def[candidate]) {
+        if ((consumers.get(v)?.size ?? 0) > 0) born++;
+      }
+      const delta = born - freed;
+      if (delta < bestDelta || (delta === bestDelta && critPath[candidate] > bestCrit)) {
+        bestDelta = delta;
+        bestCrit = critPath[candidate];
+        best = candidate;
+      }
+    }
+    if (best === -1) best = [...readySet][0];
+    scheduledSet.add(best);
+    minPressOrder.push(best);
+    readySet.delete(best);
+    for (const s of succs[best]) {
+      if (--inDeg[s] === 0) readySet.add(s);
+    }
+  }
+
+  const newOrder: number[] = [];
+  for (let j = 0; j < n; j++) {
+    const origIdx = minPressOrder[j];
+    newOrder.push(order[origIdx]);
+  }
+  return newOrder;
 }

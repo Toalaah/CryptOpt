@@ -42,6 +42,7 @@ import {
   SA_NEIGHBOR_STRATEGY_GREEDY,
   OPTIMIZER_STRATEGY_BIASED,
   MEASURE_STRATEGY_OPTIONS,
+  SCHEDULING_ALGORITHM_OPTIONS,
 } from "@/types";
 import { tmpdir } from "node:os";
 
@@ -242,14 +243,6 @@ export const makeArgs = () =>
         "Enables a feedback mechanism where the Model can defer from its standard operation ordering by influencing instruction scheduling based upon register contents.",
       boolean: true,
     })
-    .option("registerPressureThresh", {
-      number: true,
-      default: 1.0,
-      describe:
-        "Register occupancy threshold above which preemptive spilling is performed (live range splitting)",
-      min: 0,
-      max: 1,
-    })
     .option("proof", {
       default: true,
       describe:
@@ -269,6 +262,12 @@ export const makeArgs = () =>
       describe:
         "If this is set, CryptOpt will prefer spilling into vector registers as long as they are available, then start spilling into memory. Must specify --xmm switch, too. It will not try to optimize on it. (i.e. The first 16 values to be spilled will be spilled into XMMs, the rest into memory.)",
       boolean: true,
+    })
+    .option("schedulingAlgorithm", {
+      string: true,
+      default: "default",
+      describe: "Instruction scheduling algorithm to use when constructing initial model node order.",
+      choices: SCHEDULING_ALGORITHM_OPTIONS,
     })
     .option("readState", {
       string: true,

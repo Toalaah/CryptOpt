@@ -6,8 +6,8 @@ a="$1"; shift
 b="$1"; shift
 
 symbolname=$(grep GLOBAL "$a"  | cut -d' ' -f2)
-cycle_count_a=$(taskset -c 0 CountCycles "$a" | cut -d ' ' -f1)
-cycle_count_b=$(taskset -c 0 CountCycles "$b" | cut -d ' ' -f1)
+cycle_count_a=$(taskset -c 0 CountCycles "$(realpath $a)" | cut -d ' ' -f1)
+cycle_count_b=$(taskset -c 0 CountCycles "$(realpath $b)" | cut -d ' ' -f1)
 
 python3 <<EOF
 a="$a"

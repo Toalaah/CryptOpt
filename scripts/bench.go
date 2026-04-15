@@ -70,6 +70,7 @@ type Benchmark struct {
 	BetRatio                 *Values `yaml:"betRatio"`
 	Cyclegoal                *Values `yaml:"cyclegoal"`
 	DynamicOperationOrdering *Values `yaml:"dynamicOperationOrdering"`
+	SchedulingAlgorithm      *Values `yaml:"schedulingAlgorithm"`
 	ContinueRun              *Values `yaml:"continueRun"`
 }
 
@@ -96,6 +97,7 @@ type Run struct {
 	Single                   *string `flag:"single"`
 	Cyclegoal                *string `flag:"cyclegoal"`
 	DynamicOperationOrdering *string `flag:"dynamicOperationOrdering"`
+	SchedulingAlgorithm      *string `flag:"schedulingAlgorithm"`
 	ContinueRun              *string `flag:"continueRun"`
 	ResultDir                string  `flag:"-"`
 }

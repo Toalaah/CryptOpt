@@ -259,6 +259,9 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 			tmpRun.cliArgs()...,
 		)
 		cmd := exec.Command("taskset", cmdArgs...)
+		if cc := os.Getenv("CC"); cc != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("CC=%s", cc))
+		}
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 		// https://jarv.org/posts/command-with-timeout/

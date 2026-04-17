@@ -342,6 +342,7 @@ export function reorderPressureMinimizing(
   nodes: Readonly<CryptOpt.StringOperation>[],
   nodeLookupMap: ReadonlyMap<string, number>,
   order: Readonly<number>[],
+  options: { tieBreaker: "longest" | "shortest" },
 ): number[] {
   const n = nodes.length;
   const def: Set<string>[] = nodes.map(defSetForNode);
@@ -416,7 +417,15 @@ export function reorderPressureMinimizing(
   while (minPressOrder.length < n) {
     let best = -1;
     let bestDelta = Infinity;
-    let bestCrit = -1;
+    let bestCrit = options.tieBreaker == "shortest" ? Infinity : -1;
+    let tieBreaker = (candidate: number) => {
+      switch (options.tieBreaker) {
+        case "longest":
+          return critPath[candidate] > bestCrit;
+        case "shortest":
+          return critPath[candidate] < bestCrit;
+      }
+    };
     for (const candidate of readySet) {
       let freed = 0;
       for (const v of use[candidate]) {
@@ -436,7 +445,7 @@ export function reorderPressureMinimizing(
         if ((consumers.get(v)?.size ?? 0) > 0) born++;
       }
       const delta = born - freed;
-      if (delta < bestDelta || (delta === bestDelta && critPath[candidate] > bestCrit)) {
+      if (delta < bestDelta || (delta === bestDelta && tieBreaker(candidate))) {
         bestDelta = delta;
         bestCrit = critPath[candidate];
         best = candidate;

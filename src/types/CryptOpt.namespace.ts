@@ -35,7 +35,11 @@ export type MEMORY_CONSTRAINTS_OPTIONS_T = (typeof MEMORY_CONSTRAINTS_OPTIONS)[n
 export const MEASURE_STRATEGY_OPTIONS = ["measuresuite", "llvm"] as const;
 export type MEASURE_STRATEGY_OPTIONS_T = (typeof MEASURE_STRATEGY_OPTIONS)[number];
 
-export const SCHEDULING_ALGORITHM_OPTIONS = ["default", "pressure-minimizing"] as const;
+export const SCHEDULING_ALGORITHM_OPTIONS = [
+  "default",
+  "pressure-minimizing-longest",
+  "pressure-minimizing-shortest",
+] as const;
 export type SCHEDULING_ALGORITHM_OPTIONS_T = (typeof SCHEDULING_ALGORITHM_OPTIONS)[number];
 
 export const OPTIMIZER_STRATEGY_RLS = "rls";

@@ -152,12 +152,23 @@ export class Model {
     Model._neededBy = createDependencyRelation(Model._nodes, Model._nodeLookupMap, memoryConstraints);
     Model._order = toposort(Model._nodes, Model._neededBy);
 
-    if (schedulingAlgorithm == "pressure-minimizing") {
-      Model._order = reorderPressureMinimizing(
-        Model.nodesInTopologicalOrder,
-        Model._nodeLookupMap,
-        Model._order,
-      );
+    switch (schedulingAlgorithm) {
+      case "default":
+        break;
+      case "pressure-minimizing-longest":
+        Model._order = reorderPressureMinimizing(
+          Model.nodesInTopologicalOrder,
+          Model._nodeLookupMap,
+          Model._order,
+          { tieBreaker: "longest" },
+        );
+      case "pressure-minimizing-shortest":
+        Model._order = reorderPressureMinimizing(
+          Model.nodesInTopologicalOrder,
+          Model._nodeLookupMap,
+          Model._order,
+          { tieBreaker: "shortest" },
+        );
     }
 
     Logger.log(Model._order.join(" @ "));

@@ -75,11 +75,7 @@ def make_row(run: Run) -> dict:
     state_path = run[0]
     with open(state_path, "r") as f:
         state = json.load(f)["parsedArgs"]
-        base_info["scheduling_algorihtm"] = (
-            "pressure-minimizing"
-            if any(part.lower() == "heuristic" for part in state_path.parts)
-            else "default"
-        )
+        base_info["scheduling_algorihtm"] = state["schedulingAlgorithm"]
         base_info["curve"] = state["curve"]
         base_info["method"] = state["method"]
         base_info["seed"] = state["seed"]
@@ -121,6 +117,7 @@ if __name__ == "__main__":
         )
         w.writeheader()
         for run in runs:
+            print(f"Measuring {run}")
             w.writerow(make_row(run))
 
     print(f"Done. Wrote {len(runs)} rows to {args.name}.csv.")

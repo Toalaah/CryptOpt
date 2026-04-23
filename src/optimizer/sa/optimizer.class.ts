@@ -8,7 +8,6 @@ import {
   PRINT_EVERY,
   LOG_EVERY,
   writeString,
-  analyseMeasureResult,
   padSeed,
   generateResultFilename,
   shouldProof as shouldProve,

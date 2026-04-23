@@ -60,7 +60,9 @@ type Benchmark struct {
 	SaVisitParam             *Values `yaml:"saVisitParam"`
 	SaAcceptParam            *Values `yaml:"saAcceptParam"`
 	SaStepSizeParam          *Values `yaml:"saStepSizeParam"`
-	SaMaxMutStepSize         *Values `yaml:"saMaxMutStepSize"`
+	SaMutStepSizeLoc         *Values `yaml:"saMutStepSizeLoc"`
+	SaMutStepSizeMin         *Values `yaml:"saMutStepSizeMin"`
+	SaMutStepSizeMax         *Values `yaml:"saMutStepSizeMax"`
 	SaCoolingSchedule        *Values `yaml:"saCoolingSchedule"`
 	SaMaxRejectStreakGoal    *Values `yaml:"saMaxRejectStreakGoal"`
 	SaReannealRatio          *Values `yaml:"saReannealRatio"`
@@ -89,7 +91,9 @@ type Run struct {
 	SaVisitParam             *string `flag:"saVisitParam"`
 	SaAcceptParam            *string `flag:"saAcceptParam"`
 	SaStepSizeParam          *string `flag:"saStepSizeParam"`
-	SaMaxMutStepSize         *string `flag:"saMaxMutStepSize"`
+	SaMutStepSizeLoc         *string `flag:"saMutStepSizeLoc"`
+	SaMutStepSizeMin         *string `flag:"saMutStepSizeMin"`
+	SaMutStepSizeMax         *string `flag:"saMutStepSizeMax"`
 	SaCoolingSchedule        *string `flag:"saCoolingSchedule"`
 	SaReannealRatio          *string `flag:"saReannealRatio"`
 	Bets                     *string `flag:"bets"`

@@ -32,6 +32,8 @@ var (
 	seed       = flag.String("s", "", "set a fixed seed to use for all benchmark runs. Can be overwritten by setting the seed as a benchmark parameter (which takes precedence over this option). (env: $BENCHMARK_SEED)")
 	timeout    = flag.Duration("t", 90*time.Minute, "relative path to where results should be stored (env: $BENCHMARK_TIMEOUT)")
 	proof      = flag.Bool("p", true, "whether to enable/disable proofs of final assembly (env: $BENCHMARK_PROOF)")
+	verbose    = flag.Bool("v", false, "enable debug output (env: $BENCHMARK_VERBOSE")
+	nodebin    = flag.String("n", "node", "specify an alternative nodejs binary to use (env: $BENCHMARK_NODE_BIN)")
 )
 
 type Values []string
@@ -223,7 +225,7 @@ func (r Run) cliArgs() []string {
 	// 	args = append(args, "--single")
 	// }
 	if r.ContinueRun != nil {
-		args = append(args, fmt.Sprintf("--readState=%s-%s.json", *r.Curve, *r.Method))
+		args = append(args, fmt.Sprintf("--readState %s-%s.json", *r.Curve, *r.Method))
 	}
 	if !*proof {
 		args = append(args, "--no-proof")
@@ -259,10 +261,13 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 		tmpRun.ResultDir = tmpDir
 
 		cmdArgs := append(
-			[]string{"-c", strconv.Itoa(cpuID), "node", "./dist/CryptOpt.js"},
+			[]string{"-c", strconv.Itoa(cpuID), *nodebin, "./dist/CryptOpt.js"},
 			tmpRun.cliArgs()...,
 		)
 		cmd := exec.Command("taskset", cmdArgs...)
+		if pth := os.Getenv("PATH"); pth != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("PATH=%s", pth))
+		}
 		if cc := os.Getenv("CC"); cc != "" {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("CC=%s", cc))
 		}
@@ -276,6 +281,9 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 
 		cmdDone := make(chan cmdResult, 1)
 		fmt.Printf("[CPU %d] %s: Running: %s\n", cpuID, time.Now().Format(time.DateTime), id)
+		if *verbose {
+			fmt.Printf("[CPU %d] %s: Args: %s\n", cpuID, time.Now().Format(time.DateTime), strings.Join(cmd.Args, " "))
+		}
 		start := time.Now()
 		go func() {
 			var outb bytes.Buffer
@@ -355,12 +363,24 @@ func main() {
 		*benchFile = path
 	}
 
+	if node, ok := os.LookupEnv("BENCHMARK_NODE_BIN"); ok {
+		*nodebin = node
+	}
+
 	if t, ok := os.LookupEnv("BENCHMARK_TIMEOUT"); ok {
 		d, err := time.ParseDuration(t)
 		if err != nil {
 			log.Fatalf("Failed to parse timeout from env: %v", err)
 		}
 		*timeout = d
+	}
+
+	if v, ok := os.LookupEnv("BENCHMARK_VERBOSE"); ok {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			log.Fatalf("Failed to parse bool from env: %v", err)
+		}
+		*verbose = b
 	}
 
 	if p, ok := os.LookupEnv("BENCHMARK_PROOF"); ok {
@@ -419,6 +439,7 @@ func main() {
 	fmt.Printf("Total runs: %d\n", len(runs))
 	fmt.Printf("Workers: %d (CPUs 0-%d)\n", *numWorkers, *numWorkers-1)
 	fmt.Printf("Base dir: %s\n", *baseDir)
+	fmt.Printf("Verbose: %t\n", *verbose)
 	fmt.Print("Cache dir: ")
 	if *cacheDir == "" {
 		fmt.Println("(default)")

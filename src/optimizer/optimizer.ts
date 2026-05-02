@@ -16,11 +16,8 @@
 
 import { asm, OptimizerArgs } from "@/types";
 import { Logger } from "@/helper/Logger.class";
-import { Paul, sha1Hash } from "@/paul";
-import { existsSync, rmSync } from "fs";
-import { Measuresuite } from "measuresuite";
+import { Paul } from "@/paul";
 import { join } from "path";
-import { init } from "./helpers";
 import { Model } from "@/model";
 import { CHOICE, FUNCTIONS } from "@/enums";
 import globals from "@/helper/globals";
@@ -45,6 +42,7 @@ export type MutationStats = {
   numRejectedEvals: number;
   numAcceptedEvals: number;
   numUnique: number;
+  stateVisitCount: Map<number, number>;
 
   maxMutStepSize: number;
   avgMutStepSize: number;
@@ -64,7 +62,7 @@ export abstract class Optimizer {
 
   protected choice: CHOICE;
 
-  protected asmHashes: Set<string>;
+  protected asmHashes: Map<string, number>;
 
   protected isNew(asm: asm) {
     const hash = createHash("md5").update(asm).digest("hex");
@@ -73,8 +71,9 @@ export abstract class Optimizer {
 
   protected addToSeen(asm: asm) {
     const { hash, isNew } = this.isNew(asm);
-    this.asmHashes.add(hash);
-    this.mutationStats.numUnique = this.asmHashes.size;
+    const count = this.asmHashes.get(hash) ?? 0;
+    this.asmHashes.set(hash, count + 1);
+    this.mutationStats.numUnique += isNew ? 1 : 0;
     return isNew;
   }
 
@@ -110,7 +109,7 @@ export abstract class Optimizer {
     this.objective = ObjectiveFactory.make(args);
     this.libcheckfunctionDirectory = this.objective.getLibcheckfunctionDirectory();
     this.symbolname = this.objective.getSymbolname();
-    this.asmHashes = new Set<string>();
+    this.asmHashes = new Map<string, number>();
 
     this.mutationStats = {
       numMut: { permutation: 0, decision: 0 },
@@ -121,6 +120,9 @@ export abstract class Optimizer {
       numRejectedEvals: 0,
       numAcceptedEvals: 0,
       numUnique: 0,
+
+      // Map of "number of times state was visited" to frequency.
+      stateVisitCount: new Map<number, number>(),
 
       maxMutStepSize: 1,
       avgMutStepSize: 1,
@@ -153,6 +155,12 @@ export abstract class Optimizer {
 
   public abstract optimise(): Promise<OptimizerResult>;
   public getMutationStats(): MutationStats {
+    if (this.mutationStats.stateVisitCount.size == 0) {
+      this.asmHashes.forEach((v) => {
+        const freq = this.mutationStats.stateVisitCount.get(v) ?? 0;
+        this.mutationStats.stateVisitCount.set(v, freq + 1);
+      });
+    }
     return this.mutationStats;
   }
 

@@ -19,26 +19,23 @@ import { FiatBridge } from "@/bridge/fiat-bridge";
 import { errorOut, ERRORS } from "@/errors";
 import { execSync } from "child_process";
 import { appendFileSync } from "fs";
-import { sum } from "simple-statistics";
 import { Model } from "@/model";
 import { CHOICE } from "@/enums";
 import { cauchy } from "@/paul/distributions";
 
 export class SAOptimizer extends Optimizer {
-  // Number of iterations to perform during optimization.
   private nIter: number;
-  // Optimizer-specific args
-  private initialTemperature: number;
-  private reAnnealRatio: number;
-  private maxNoImproveStreak: number;
-  private mutationStepSizeMin: number; // Min number of "steps" a single candidate shall take. Depends also on the current temperature.
-  private mutationStepSizeMax: number; // Maximum number of "steps" a single candidate shall take. Depends also on the current temperature.
-  private mutationStepSizeLoc: number;
   private acceptParam: number;
   private visitParam: number;
   private stepSizeParam: number;
-  private numNeighbors: number;
-  private neighborSelectionFunc: NeighborSelectionFunc<number>;
+
+  private initialTemperature: number;
+  private reannealThreshold: number;
+  private reannealCutoff: number;
+
+  private mutationStepSizeMin: number; // Min number of "steps" a single candidate shall take. Depends also on the current temperature.
+  private mutationStepSizeMax: number; // Maximum number of "steps" a single candidate shall take. Depends also on the current temperature.
+  private mutationStepSizeLoc: number; // Center of distribution. This should really never *not* be 1, honestly.
 
   private coolingSchedule: CoolingSchedule;
 
@@ -46,11 +43,13 @@ export class SAOptimizer extends Optimizer {
     super(args);
 
     this.nIter = this.args.evals;
+    this.acceptParam = this.args.saAcceptParam;
+    this.visitParam = this.args.saVisitParam;
+    this.stepSizeParam = this.args.saStepSizeParam;
 
     this.initialTemperature = this.args.saInitialTemperature;
-    if (this.initialTemperature <= 0) {
-      this.initialTemperature = Number.EPSILON;
-    }
+    if (this.initialTemperature <= 0) throw new Error(`initial temperature must be positive`);
+
     this.mutationStepSizeLoc = Math.round(this.args.saMutStepSizeLoc);
     this.mutationStepSizeMin = Math.round(this.args.saMutStepSizeMin);
     this.mutationStepSizeMax = Math.round(this.args.saMutStepSizeMax);
@@ -61,29 +60,7 @@ export class SAOptimizer extends Optimizer {
       this.mutationStepSizeLoc < this.mutationStepSizeMin
     )
       throw new Error(`loc mut step size must be between min and max mutstepsize`);
-    this.acceptParam = this.args.saAcceptParam;
-    this.visitParam = this.args.saVisitParam;
-    this.stepSizeParam = this.args.saStepSizeParam;
-    this.numNeighbors = Math.max(1, Math.round(this.args.saNumNeighbors));
-    switch (this.args.saNeighborStrategy) {
-      case "uniform":
-        this.neighborSelectionFunc = makeUniformNeighborSelection();
-        break;
-      case "greedy":
-        this.neighborSelectionFunc = makeGreedyNeighborSelection();
-        break;
-      case "weighted":
-        this.neighborSelectionFunc = makeWeigtedNeighborSelection(this.numNeighbors);
-        break;
-      default:
-        throw new Error(`unknown neighbor proposal strategy: ${this.args.saNeighborStrategy}`);
-    }
-    if (this.numNeighbors === 1) {
-      this.neighborSelectionFunc = (_candidates: number[]) => 0;
-      FileLogger.log("using no-op neighbor strategy as numNeighbors=1");
-    } else {
-      FileLogger.log(`neighbor strategy: ${this.args.saNeighborStrategy}`);
-    }
+
     switch (this.args.saCoolingSchedule) {
       case "exp":
         this.coolingSchedule = makeExpCoolingSchedule(this.visitParam, this.initialTemperature);
@@ -97,19 +74,9 @@ export class SAOptimizer extends Optimizer {
       default:
         throw new Error(`unknown cooling schedule: ${this.args.saCoolingSchedule}`);
     }
-    FileLogger.log(`cooling schedule: ${this.args.saCoolingSchedule}`);
-    this.reAnnealRatio = this.args.saReannealRatio;
-    if (this.args.saReannealFrequency === 0) {
-      this.reAnnealRatio = 0;
-    } else if (this.args.saReannealFrequency > 0) {
-      const numEvalsBetweenReanneal = Math.round(this.nIter / (this.args.saReannealFrequency + 1));
-      const tempAfter = this.coolingSchedule(numEvalsBetweenReanneal);
-      this.reAnnealRatio = tempAfter / this.initialTemperature + Number.EPSILON;
-      FileLogger.log(
-        `dynamically adjusting saReannealRatio so that will re-anneal ${this.args.saReannealFrequency} times (n = ${numEvalsBetweenReanneal}, tempAfterN=${tempAfter}, new_ratio = ${(this.reAnnealRatio = tempAfter / this.initialTemperature)})`,
-      );
-    }
-    this.maxNoImproveStreak = this.args.saMaxRejectStreakGoal;
+
+    this.reannealThreshold = this.args.saMaxRejectStreakGoal;
+    this.reannealCutoff = this.args.saMaxRejectStreakGoal;
   }
 
   private shouldAccept(currentEnergy: number, visitEnergy: number, temp: number) {
@@ -133,6 +100,7 @@ export class SAOptimizer extends Optimizer {
   }
 
   public optimise() {
+    type State = { asm: string; ratio: number; cycleCount: number };
     type Candidate = {
       asm: string;
       stacklength: number;
@@ -140,9 +108,10 @@ export class SAOptimizer extends Optimizer {
       ninst: number;
       mutStats: { numDecision: number; numPerm: number };
     };
-    type State = { asm: string; ratio: number; cycleCount: number };
-    // Initialize candidate slots (index 0 is current function, hence the +1).
-    const candidates = new Array<Candidate>(1 + this.numNeighbors);
+    const CURRENT_FUNCTION = 0 as const;
+    const CANDIDATE_FUNCTION = 1 as const;
+    const CHECK = 2 as const;
+    const candidates = new Array<Candidate>(2);
     for (let i = 0; i < candidates.length; ++i) {
       candidates[i] = {
         asm: "",
@@ -155,17 +124,15 @@ export class SAOptimizer extends Optimizer {
         },
       };
     }
-    const CURRENT_FUNCTION = 0 as const;
+
     let ratioString = "";
-    let accumulatedTimeSpentByMeasuring = 0;
-    let numEvals = 0; // NB: numEvals does not necessarily == iteration loop, as multiple neighbors implies multiple evaluations per loop.
-    let currentEpoch = 0;
-    // const reannealThresh = this.initialTemperature * this.reAnnealRatio;
-    let annealingIndex = 0; // Separate tracking of annealing step as we may reset it when re-annealing, thus breaking the prior invariant of epoch == annealingIndex.
+    let numEvals = 0;
+    let temperature = 0;
+
     let xBestRatio: State = { asm: "", ratio: 0, cycleCount: Infinity }; // Add slot for storing the best result we see.
     let xBestCycle: State = { asm: "", ratio: 0, cycleCount: Infinity }; // Add slot for storing the best result we see.
     let current: State = { asm: "", ratio: 0, cycleCount: 0 };
-    let temperature = 0;
+
     let showPerSecond = "many/s";
     let perSecondCounter = 0;
 
@@ -173,11 +140,36 @@ export class SAOptimizer extends Optimizer {
     let currentRejectStreak = 0;
 
     // Used to track how/when we should reanneal.
-    let numAccepted = 0;
+    let annealingIndex = 0;
+    let numAcceptedInCurrentAnnealingCycle = 0;
     let numRejected = 0;
     let currentAnnealingCycleStartCycle = 0;
-    let currentMaxNoImproveStreak = this.maxNoImproveStreak;
+    let currentAnnealingCycleThreshold = this.reannealThreshold;
+
     // Various helpers used in main optimization loop below.
+
+    const assemble = (slot: number): { asm: string; wasNew: boolean } => {
+      Logger.log("assembling");
+      const assembleResult = assembleASM(this.args.resultDir);
+      const code = assembleResult.code;
+      const filteredInstructions = strip(code);
+      if (slot === 0) this.no_of_instructions = filteredInstructions.length;
+      const asm = (() => {
+        switch (this.args.verbose) {
+          case true:
+            const c = code.join("\n");
+            writeString(pathResolve(this.libcheckfunctionDirectory, `current${slot}.asm`), c);
+            return c;
+          case false:
+            return filteredInstructions.join("\n");
+        }
+      })();
+      const wasNew = this.addToSeen(asm);
+      candidates[slot].asm = asm;
+      candidates[slot].stacklength = assembleResult.stacklength;
+      candidates[slot].ninst = filteredInstructions.length;
+      return { asm, wasNew };
+    };
 
     /**
      * Determines when the optimization loop should end.
@@ -185,13 +177,12 @@ export class SAOptimizer extends Optimizer {
     const shouldStop = () => numEvals >= this.nIter;
 
     const shouldReanneal = () => {
-      if (numRejected < currentMaxNoImproveStreak) return false;
+      if (numRejected < currentAnnealingCycleThreshold) return false;
       const percentageImprovement =
         (current.cycleCount - currentAnnealingCycleStartCycle) / currentAnnealingCycleStartCycle;
       if (percentageImprovement >= 0) return false; // We are better than at start of annealing cycle.
-      // We have decayed more than 2% since last reanneal
-      return -percentageImprovement >= 0.05;
-      // return percentageImprovement <= 0.01;
+      // We have decayed more than x% since last reanneal
+      return percentageImprovement < this.reannealCutoff;
     };
 
     /**
@@ -234,70 +225,46 @@ export class SAOptimizer extends Optimizer {
       return mutResult;
     };
 
-    /**
-     * Assembles and saves the current model into `slot`.
-     */
-    const assemble = (slot: number) => {
-      Logger.log("assembling");
-      const assembleResult = assembleASM(this.args.resultDir);
-      const code = assembleResult.code;
-      const filteredInstructions = strip(code);
-      if (slot === 0) this.no_of_instructions = filteredInstructions.length;
-      const asm = (() => {
-        switch (this.args.verbose) {
-          case true:
-            const c = code.join("\n");
-            writeString(pathResolve(this.libcheckfunctionDirectory, `current${slot}.asm`), c);
-            return c;
-          case false:
-            return filteredInstructions.join("\n");
-        }
-      })();
-      candidates[slot].asm = asm;
-      candidates[slot].stacklength = assembleResult.stacklength;
-      candidates[slot].ninst = filteredInstructions.length;
-      return this.addToSeen(asm);
-    };
-
     return new Promise<OptimizerResult>((resolve) => {
-      FileLogger.log("starting sa optimisation");
-      const optimistaionStartDate = Date.now();
-      let time = Date.now();
-      let wasNewCandidate = false;
+      Logger.log("starting sa optimisation");
       printStartInfo({
         ...this.args,
-        symbolname: this.symbolname,
+        symbolname: this.objective.getSymbolname(),
         counter: this.objective.getCounter(),
       });
 
+      const optimistaionStartDate = Date.now();
+      let time = Date.now();
+      let accumulatedTimeSpentByMeasuring = 0;
+
       // Before running the optimization loop, assemble the baseline program (at this point, no mutations have taken place).
       {
-        assemble(CURRENT_FUNCTION);
+        const { asm } = assemble(CURRENT_FUNCTION);
         // Check for errors, if nothing happens here we are probably fine for the rest of the run.
-        if (candidates[CURRENT_FUNCTION].asm.includes("undefined"))
+        if (asm.includes("undefined"))
           errorOut({ msg: "ASM string empty/undefined, big yikes", exitCode: 1 });
-        current.asm = candidates[CURRENT_FUNCTION].asm;
       }
 
       const intervalHandle = setInterval(() => {
-        temperature = this.coolingSchedule(annealingIndex);
+        temperature = this.coolingSchedule(annealingIndex) * Math.pow(0.95, this.mutationStats.numReanneals);
+        let wasNewCandidate = false;
+        const currentEpoch = numEvals;
         if (temperature <= 0) errorOut({ exitCode: 123, msg: "temperature <= 0" });
         FileLogger.log(`epoch ${currentEpoch}, temp=${temperature}`);
 
         // Mutation & candidate generation.
         {
           Model.saveSnaphot("current");
-          for (let i = 1; i <= this.numNeighbors; ++i) {
-            const { perm, decision } = sampleNeighbor(i, temperature);
-            this.mutationStats.numMut.permutation += perm;
-            this.mutationStats.numMut.decision += decision;
-            candidates[i].mutStats.numPerm = perm;
-            candidates[i].mutStats.numDecision = decision;
-            candidates[i].choice = this.choice;
-            wasNewCandidate = assemble(i);
-            numEvals++;
-            Model.restoreSnapshot("current");
-          }
+          const { perm, decision } = sampleNeighbor(CANDIDATE_FUNCTION, temperature);
+          const { asm, wasNew } = assemble(CANDIDATE_FUNCTION);
+          wasNewCandidate = wasNew;
+          candidates[CANDIDATE_FUNCTION].mutStats.numPerm = perm;
+          candidates[CANDIDATE_FUNCTION].mutStats.numDecision = decision;
+          candidates[CANDIDATE_FUNCTION].asm = asm;
+          candidates[CANDIDATE_FUNCTION].choice = this.choice;
+          this.mutationStats.numMut.permutation += perm;
+          this.mutationStats.numMut.decision += decision;
+          Model.restoreSnapshot("current");
         }
 
         // Perform measurements.
@@ -310,32 +277,25 @@ export class SAOptimizer extends Optimizer {
                   candidates[i].asm,
                 ),
               );
-            FileLogger.log("comparing candidates");
             const now_measure = Date.now();
-            const result = this.objective.measure(candidates.map((c) => c.asm));
+            const analyseResult = this.objective.measure(candidates.map((c) => c.asm));
             accumulatedTimeSpentByMeasuring += Date.now() - now_measure;
-            FileLogger.log("done with measurements for current iteration");
-            return result;
+            return analyseResult;
           } catch (e) {
             this.handleMeasurementError(e);
           }
         })();
 
-        FileLogger.log(`analyseResult: ${JSON.stringify(analyseResult.rawMedian)}`);
         const meanrawCurrent = analyseResult.rawMedian[CURRENT_FUNCTION];
-        const meanrawNeighbors = analyseResult.rawMedian.slice(1, analyseResult.rawMedian.length - 1);
-        // + 1 cause index 0 is always the current ASM string.
-        const neighborIdx = this.neighborSelectionFunc(meanrawNeighbors.map((x) => this.energy(x))) + 1;
-        FileLogger.log(`chose neighbor: ${neighborIdx}`);
-        const meanrawCandidate = analyseResult.rawMedian[neighborIdx];
-        const meanrawCheck = analyseResult.rawMedian[analyseResult.rawMedian.length - 1];
+        const meanrawCandidate = analyseResult.rawMedian[CANDIDATE_FUNCTION];
+        const meanrawCheck = analyseResult.rawMedian[CHECK];
 
         let didSeeBest = false;
         for (let i = 0; i < analyseResult.rawMedian.length - 1; ++i) {
           const res = analyseResult.rawMedian[i];
           const ratio = meanrawCheck / res;
           const cycleCount = analyseResult.batchSizeScaledrawMedian[i];
-          didSeeBest = updateBest({ asm: candidates[i].asm, ratio, cycleCount }) && neighborIdx === i;
+          didSeeBest = updateBest({ asm: candidates[i].asm, ratio, cycleCount }) && CANDIDATE_FUNCTION === i;
         }
 
         // Decide whether we want to keep mutated candidate.
@@ -343,44 +303,41 @@ export class SAOptimizer extends Optimizer {
         if (
           (kept = this.shouldAccept(this.energy(meanrawCurrent), this.energy(meanrawCandidate), temperature))
         ) {
+          Logger.log("kept mutation");
           this.mutationStats.numAcceptedEvals++;
-          numAccepted++;
+          numAcceptedInCurrentAnnealingCycle++;
           currentRejectStreak = 0;
-          currentAcceptStreak++;
           this.mutationStats.maxAcceptStreak = Math.max(
             this.mutationStats.maxAcceptStreak,
-            currentAcceptStreak,
+            ++currentAcceptStreak,
           );
-
-          FileLogger.log(`keeping mutated candidate ${neighborIdx}`);
-          candidates[CURRENT_FUNCTION].asm = candidates[neighborIdx].asm;
-          candidates[CURRENT_FUNCTION].stacklength = candidates[neighborIdx].stacklength;
-          candidates[CURRENT_FUNCTION].choice = candidates[neighborIdx].choice;
-          candidates[CURRENT_FUNCTION].ninst = candidates[neighborIdx].ninst;
-          this.no_of_instructions = candidates[neighborIdx].ninst;
-          Model.restoreSnapshot(neighborIdx.toString());
-          if (didSeeBest) Model.saveSnaphot("best");
+          candidates[CURRENT_FUNCTION].asm = candidates[CANDIDATE_FUNCTION].asm;
+          candidates[CURRENT_FUNCTION].stacklength = candidates[CANDIDATE_FUNCTION].stacklength;
+          candidates[CURRENT_FUNCTION].choice = candidates[CANDIDATE_FUNCTION].choice;
+          candidates[CURRENT_FUNCTION].ninst = candidates[CANDIDATE_FUNCTION].ninst;
+          this.no_of_instructions = candidates[CANDIDATE_FUNCTION].ninst;
+          Model.restoreSnapshot(CANDIDATE_FUNCTION.toString());
+          // if (didSeeBest) Model.saveSnaphot("best");
         } else {
+          Logger.log("keeping current");
           this.mutationStats.numRejectedEvals++;
           numRejected++;
           currentAcceptStreak = 0;
-          currentRejectStreak++;
           this.mutationStats.maxRejectStreak = Math.max(
             this.mutationStats.maxRejectStreak,
-            currentRejectStreak,
+            ++currentRejectStreak,
           );
           // Nothing needs to be done in this case, since we always pop the "current" state after exploring neighbors.
-          FileLogger.log("keeping current");
           // Use rejected candidate's choice here. TODO: does this even make sense to track in such a way if we perform multiple mutations? Might be more useful to just update a counter...
-          this.choice = candidates[neighborIdx].choice;
-          this.mutationStats.numRevert.permutation += candidates[neighborIdx].mutStats.numPerm;
-          this.mutationStats.numRevert.decision += candidates[neighborIdx].mutStats.numDecision;
+          this.choice = candidates[CANDIDATE_FUNCTION].choice;
+          this.mutationStats.numRevert.permutation += candidates[CANDIDATE_FUNCTION].mutStats.numPerm;
+          this.mutationStats.numRevert.decision += candidates[CANDIDATE_FUNCTION].mutStats.numDecision;
         }
 
         // Start statistics & status update.
         {
-          const indexGood = kept ? neighborIdx : 0;
-          const indexBad = kept ? 0 : neighborIdx;
+          const indexGood = kept ? CANDIDATE_FUNCTION : CURRENT_FUNCTION;
+          const indexBad = kept ? CURRENT_FUNCTION : CANDIDATE_FUNCTION;
           const goodChunks = analyseResult.chunks[indexGood];
           const badChunks = analyseResult.chunks[indexBad];
           const minRaw = Math.min(meanrawCurrent, meanrawCandidate);
@@ -427,8 +384,8 @@ export class SAOptimizer extends Optimizer {
             wasNewCandidate,
             numEvals: numEvals,
             epoch: currentEpoch,
-            nDesc: candidates[neighborIdx].mutStats.numDecision,
-            nPerm: candidates[neighborIdx].mutStats.numPerm,
+            nDesc: candidates[CANDIDATE_FUNCTION].mutStats.numDecision,
+            nPerm: candidates[CANDIDATE_FUNCTION].mutStats.numPerm,
             temp: temperature,
             ratio: currentRatio,
           });
@@ -458,17 +415,18 @@ export class SAOptimizer extends Optimizer {
           }
         } // End statistics
 
-        currentEpoch++;
+        numEvals++;
         annealingIndex++;
 
         // Determine whether to re-anneal.
         if (shouldReanneal()) {
-          FileLogger.log(`reannealing`);
+          Logger.log(`reannealing`);
           annealingIndex = 0;
-          numAccepted = 0;
+          this.mutationStats.numReanneals++;
+          numAcceptedInCurrentAnnealingCycle = 0;
           numRejected = 0;
-          Model.restoreSnapshot("best");
-          currentMaxNoImproveStreak *= 2;
+          // Model.restoreSnapshot("best");
+          currentAnnealingCycleThreshold *= 2;
           currentAnnealingCycleStartCycle = xBestCycle.cycleCount;
         }
 
@@ -589,6 +547,8 @@ export class SAOptimizer extends Optimizer {
   }
 }
 
+type CoolingSchedule = (n: number) => number;
+
 function makeExpCoolingSchedule(visitParam: number, initialTemp: number): CoolingSchedule {
   const a = visitParam - 1;
   const t1 = Math.expm1(a * Math.log(2.0)); // 2^a - 1
@@ -615,40 +575,3 @@ function makeLogCoolingSchedule(visitParam: number, initialTemp: number): Coolin
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
-
-type CoolingSchedule = (n: number) => number;
-
-function makeUniformNeighborSelection(): NeighborSelectionFunc<number> {
-  return (candidates: number[]) => Paul.chooseBetween(candidates.length);
-}
-
-function makeGreedyNeighborSelection(): NeighborSelectionFunc<number> {
-  return (candidates: number[]) => candidates.indexOf(Math.min(...candidates));
-}
-
-function makeWeigtedNeighborSelection(n: number): NeighborSelectionFunc<number> {
-  if (n < 0) {
-    throw new Error("number of neighbors must be positive");
-  } else if (n === 1) {
-    throw new Error("specified weighted neighbor strategy, but provided nonsensical neighbor count of 1");
-  }
-
-  const normalizingFactor = 1 / (n - 1);
-
-  return (candidates: number[]) => {
-    const totalEnergy = sum(candidates);
-    const probabilities = new Array<number>(n);
-    for (let i = 0; i < candidates.length; ++i) {
-      const energy = candidates[i];
-      probabilities[i] = normalizingFactor * (1 - energy / totalEnergy);
-    }
-    Logger.log(JSON.stringify({ candidates, totalEnergy, probabilities }));
-    const idx = Paul.chooseWithProbabilities(probabilities);
-    return idx;
-  };
-}
-
-/**
- * NeighborSelectionFunc takes a set of candidate energy values and returns the index `i` of the chosen neighbor as determined by the underlying algorithm.
- */
-type NeighborSelectionFunc<T> = (neighbors: T[]) => number;

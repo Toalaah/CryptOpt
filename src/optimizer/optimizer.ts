@@ -37,6 +37,8 @@ export type MutationStats = {
   numMut: { permutation: number; decision: number };
   numRevert: { permutation: number; decision: number };
 
+  numReanneals: number
+
   maxRejectStreak: number;
   maxAcceptStreak: number;
   numRejectedEvals: number;
@@ -114,6 +116,7 @@ export abstract class Optimizer {
     this.mutationStats = {
       numMut: { permutation: 0, decision: 0 },
       numRevert: { permutation: 0, decision: 0 },
+      numReanneals: 0,
 
       maxRejectStreak: 0,
       maxAcceptStreak: 0,

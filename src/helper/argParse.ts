@@ -91,7 +91,7 @@ export const makeArgs = () =>
     // START SA-specific args
     .option("saInitialTemperature", {
       number: true,
-      default: 10000,
+      default: 1000,
       min: 0,
       describe: "Initial annealing temperature to use (has no effect if optimizer is not set to 'sa').",
     })

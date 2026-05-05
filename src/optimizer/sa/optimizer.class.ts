@@ -175,30 +175,23 @@ export class SAOptimizer extends Optimizer {
     // Used to track how/when we should reanneal.
     let numAccepted = 0;
     let numRejected = 0;
-    let currentAnnealingCycleStartRatio = 0;
+    let currentAnnealingCycleStartCycle = 0;
+    let currentMaxNoImproveStreak = this.maxNoImproveStreak;
     // Various helpers used in main optimization loop below.
 
     /**
      * Determines when the optimization loop should end.
      */
     const shouldStop = () => numEvals >= this.nIter;
-    // const shouldStop = () =>
-    //   numEvals >= this.nIter ||
-    //   this.mutationStats.numMut.permutation + this.mutationStats.numMut.decision >= this.nIter;
 
-    // const shouldResetToBest = () => currentRejectStreak >= this.maxNoImproveStreak;
-
-    // const shouldReanneal = () => currentRejectStreak >= this.maxNoImproveStreak;
     const shouldReanneal = () => {
-      // const total = numAccepted + numRejected;
-      // if (total < 500) return false;
-      if (numRejected < this.maxNoImproveStreak) return false;
-      // if (globals.currentRatio < currentAnnealingCycleStartRatio) return true;
+      if (numRejected < currentMaxNoImproveStreak) return false;
       const percentageImprovement =
-        (globals.currentRatio - currentAnnealingCycleStartRatio) / currentAnnealingCycleStartRatio;
+        (current.cycleCount - currentAnnealingCycleStartCycle) / currentAnnealingCycleStartCycle;
       if (percentageImprovement >= 0) return false; // We are better than at start of annealing cycle.
       // We have decayed more than 2% since last reanneal
-      return -percentageImprovement >= 0.02;
+      return -percentageImprovement >= 0.05;
+      // return percentageImprovement <= 0.01;
     };
 
     /**
@@ -210,7 +203,7 @@ export class SAOptimizer extends Optimizer {
         xBestRatio.asm = state.asm;
         xBestRatio.ratio = state.ratio;
         xBestRatio.cycleCount = state.cycleCount;
-        didUpdate = true;
+        // didUpdate = true;
       }
       if (state.cycleCount <= xBestCycle.cycleCount) {
         xBestCycle.asm = state.asm;
@@ -366,6 +359,7 @@ export class SAOptimizer extends Optimizer {
           candidates[CURRENT_FUNCTION].ninst = candidates[neighborIdx].ninst;
           this.no_of_instructions = candidates[neighborIdx].ninst;
           Model.restoreSnapshot(neighborIdx.toString());
+          if (didSeeBest) Model.saveSnaphot("best");
         } else {
           this.mutationStats.numRejectedEvals++;
           numRejected++;
@@ -397,7 +391,7 @@ export class SAOptimizer extends Optimizer {
           current.ratio = currentRatio;
           current.cycleCount = currentCycleCount;
           globals.currentRatio = currentRatio;
-          if (currentAnnealingCycleStartRatio == 0) currentAnnealingCycleStartRatio = currentRatio;
+          if (currentAnnealingCycleStartCycle == 0) currentAnnealingCycleStartCycle = currentCycleCount;
 
           // Update globals w.r.t best ratios/cycle counts.
           {
@@ -473,7 +467,9 @@ export class SAOptimizer extends Optimizer {
           annealingIndex = 0;
           numAccepted = 0;
           numRejected = 0;
-          currentAnnealingCycleStartRatio = globals.currentRatio;
+          Model.restoreSnapshot("best");
+          currentMaxNoImproveStreak *= 2;
+          currentAnnealingCycleStartCycle = xBestCycle.cycleCount;
         }
 
         // Start cleanup

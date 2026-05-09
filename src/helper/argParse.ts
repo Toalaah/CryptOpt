@@ -91,7 +91,7 @@ export const makeArgs = () =>
     // START SA-specific args
     .option("saInitialTemperature", {
       number: true,
-      default: 1000,
+      default: 5000,
       min: 0,
       describe: "Initial annealing temperature to use (has no effect if optimizer is not set to 'sa').",
     })
@@ -104,7 +104,7 @@ export const makeArgs = () =>
     })
     .option("saAcceptParam", {
       number: true,
-      default: 0,
+      default: 1.0,
       describe: "Acceptance parameter value (has no effect if optimizer is not set to 'sa').",
     })
     .option("saNeighborStrategy", {
@@ -122,7 +122,7 @@ export const makeArgs = () =>
     })
     .option("saStepSizeParam", {
       number: true,
-      default: 0.002,
+      default: 0.005,
       describe: "Step size parameter value (has no effect if optimizer is not set to 'sa').",
     })
     .option("saMutStepSizeLoc", {
@@ -139,7 +139,7 @@ export const makeArgs = () =>
     })
     .option("saMutStepSizeMax", {
       number: true,
-      default: Infinity,
+      default: 50,
       describe:
         "Maximum step size of mutations to perform when sampling a new neighbor. Higher values allow the optimizer to navigate the search space more quickly, at the expense of less local search. Leave unset for unrestricted maximum step size.",
       min: 0,
@@ -165,10 +165,16 @@ export const makeArgs = () =>
         "Dynamically adjusts reannealing treshhold such that SA optimizer will perform reannealing n times throughout the optimization loop. Set to 0 to disable. Takes precedence over saReannealRatio",
       min: -1,
     })
-    .option("saMaxRejectStreakGoal", {
+    .option("saReannealBaseThreshold", {
       number: true,
       default: 1000,
-      describe: "Min length of reject streak after which to allow reannealing.",
+      describe: "Min number of epochs in an annealing cycle before reannealing is allowed. Doubles after each reanneal.",
+    })
+    .option("saBestStalenessThreshold", {
+      number: true,
+      default: 500,
+      describe:
+        "Number of epochs without improvement to xBestCycle after which reannealing is triggered (once the epoch gate is open).",
     })
     // END SA-specific args
     .option("bridge", {

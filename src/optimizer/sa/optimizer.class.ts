@@ -31,7 +31,7 @@ export class SAOptimizer extends Optimizer {
 
   private initialTemperature: number;
   private reannealThreshold: number;
-  private reannealCutoff: number;
+  private bestStalenessThreshold: number;
 
   private mutationStepSizeMin: number; // Min number of "steps" a single candidate shall take. Depends also on the current temperature.
   private mutationStepSizeMax: number; // Maximum number of "steps" a single candidate shall take. Depends also on the current temperature.
@@ -75,8 +75,8 @@ export class SAOptimizer extends Optimizer {
         throw new Error(`unknown cooling schedule: ${this.args.saCoolingSchedule}`);
     }
 
-    this.reannealThreshold = this.args.saMaxRejectStreakGoal;
-    this.reannealCutoff = this.args.saMaxRejectStreakGoal;
+    this.reannealThreshold = this.args.saReannealBaseThreshold;
+    this.bestStalenessThreshold = this.args.saBestStalenessThreshold;
   }
 
   private shouldAccept(currentEnergy: number, visitEnergy: number, temp: number) {
@@ -141,10 +141,8 @@ export class SAOptimizer extends Optimizer {
 
     // Used to track how/when we should reanneal.
     let annealingIndex = 0;
-    let numAcceptedInCurrentAnnealingCycle = 0;
-    let numRejected = 0;
-    let currentAnnealingCycleStartCycle = 0;
     let currentAnnealingCycleThreshold = this.reannealThreshold;
+    let epochsSinceLastBestImprovement = 0;
 
     // Various helpers used in main optimization loop below.
 
@@ -177,12 +175,8 @@ export class SAOptimizer extends Optimizer {
     const shouldStop = () => numEvals >= this.nIter;
 
     const shouldReanneal = () => {
-      if (numRejected < currentAnnealingCycleThreshold) return false;
-      const percentageImprovement =
-        (current.cycleCount - currentAnnealingCycleStartCycle) / currentAnnealingCycleStartCycle;
-      if (percentageImprovement >= 0) return false; // We are better than at start of annealing cycle.
-      // We have decayed more than x% since last reanneal
-      return percentageImprovement < this.reannealCutoff;
+      if (annealingIndex < currentAnnealingCycleThreshold) return false;
+      return epochsSinceLastBestImprovement >= this.bestStalenessThreshold;
     };
 
     /**
@@ -215,7 +209,7 @@ export class SAOptimizer extends Optimizer {
         const n = Math.abs(Math.round(cauchy({ loc: this.mutationStepSizeLoc, scale: scaledTemp })));
         const clamped = clamp(n, this.mutationStepSizeMin, this.mutationStepSizeMax);
         if (clamped > this.mutationStats.maxMutStepSize) this.mutationStats.maxMutStepSize = clamped;
-        FileLogger.log(
+        Logger.log(
           `sampled neighbor ${slot} with step size of ${n} (clamped=${clamped}) (scale=${scaledTemp}, loc=${this.mutationStepSizeLoc})`,
         );
         return clamped;
@@ -246,7 +240,7 @@ export class SAOptimizer extends Optimizer {
       }
 
       const intervalHandle = setInterval(() => {
-        temperature = this.coolingSchedule(annealingIndex) * Math.pow(0.95, this.mutationStats.numReanneals);
+        temperature = this.coolingSchedule(annealingIndex) * Math.pow(0.90, this.mutationStats.numReanneals);
         let wasNewCandidate = false;
         const currentEpoch = numEvals;
         if (temperature <= 0) errorOut({ exitCode: 123, msg: "temperature <= 0" });
@@ -290,12 +284,24 @@ export class SAOptimizer extends Optimizer {
         const meanrawCandidate = analyseResult.rawMedian[CANDIDATE_FUNCTION];
         const meanrawCheck = analyseResult.rawMedian[CHECK];
 
+        // Logger.log(
+        //   `score_current ${meanrawCurrent} candidate ${meanrawCandidate} candidate is ${meanrawCurrent - meanrawCandidate} faster`,
+        // );
+
         let didSeeBest = false;
+        let didUpdateBest = false;
         for (let i = 0; i < analyseResult.rawMedian.length - 1; ++i) {
           const res = analyseResult.rawMedian[i];
           const ratio = meanrawCheck / res;
           const cycleCount = analyseResult.batchSizeScaledrawMedian[i];
-          didSeeBest = updateBest({ asm: candidates[i].asm, ratio, cycleCount }) && CANDIDATE_FUNCTION === i;
+          const improved = updateBest({ asm: candidates[i].asm, ratio, cycleCount });
+          if (improved) didUpdateBest = true;
+          didSeeBest = improved && CANDIDATE_FUNCTION === i;
+        }
+        if (didUpdateBest) {
+          epochsSinceLastBestImprovement = 0;
+        } else {
+          epochsSinceLastBestImprovement++;
         }
 
         // Decide whether we want to keep mutated candidate.
@@ -305,7 +311,6 @@ export class SAOptimizer extends Optimizer {
         ) {
           Logger.log("kept mutation");
           this.mutationStats.numAcceptedEvals++;
-          numAcceptedInCurrentAnnealingCycle++;
           currentRejectStreak = 0;
           this.mutationStats.maxAcceptStreak = Math.max(
             this.mutationStats.maxAcceptStreak,
@@ -317,11 +322,12 @@ export class SAOptimizer extends Optimizer {
           candidates[CURRENT_FUNCTION].ninst = candidates[CANDIDATE_FUNCTION].ninst;
           this.no_of_instructions = candidates[CANDIDATE_FUNCTION].ninst;
           Model.restoreSnapshot(CANDIDATE_FUNCTION.toString());
-          // if (didSeeBest) Model.saveSnaphot("best");
+          if (didSeeBest) {
+            Model.saveSnaphot("best");
+          }
         } else {
           Logger.log("keeping current");
           this.mutationStats.numRejectedEvals++;
-          numRejected++;
           currentAcceptStreak = 0;
           this.mutationStats.maxRejectStreak = Math.max(
             this.mutationStats.maxRejectStreak,
@@ -348,7 +354,6 @@ export class SAOptimizer extends Optimizer {
           current.ratio = currentRatio;
           current.cycleCount = currentCycleCount;
           globals.currentRatio = currentRatio;
-          if (currentAnnealingCycleStartCycle == 0) currentAnnealingCycleStartCycle = currentCycleCount;
 
           // Update globals w.r.t best ratios/cycle counts.
           {
@@ -421,13 +426,11 @@ export class SAOptimizer extends Optimizer {
         // Determine whether to re-anneal.
         if (shouldReanneal()) {
           Logger.log(`reannealing`);
-          annealingIndex = 0;
           this.mutationStats.numReanneals++;
-          numAcceptedInCurrentAnnealingCycle = 0;
-          numRejected = 0;
+          annealingIndex = 0;
+          epochsSinceLastBestImprovement = 0;
           // Model.restoreSnapshot("best");
           currentAnnealingCycleThreshold *= 2;
-          currentAnnealingCycleStartCycle = xBestCycle.cycleCount;
         }
 
         // Start cleanup
@@ -440,6 +443,7 @@ export class SAOptimizer extends Optimizer {
             let statistics: string[];
             const elapsed = Date.now() - optimistaionStartDate;
             const paddedSeed = padSeed(Paul.initialSeed);
+            Model.restoreSnapshot("best");
 
             let final = current;
             const finalAsm = final.asm;

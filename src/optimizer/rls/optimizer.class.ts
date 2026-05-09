@@ -169,6 +169,12 @@ export class RLSOptimizer extends Optimizer {
 
           Logger.log(currentFunctionIsA() ? "New".padEnd(10) : "New".padStart(10));
 
+          if (currentFunctionIsA()) {
+            Logger.log(`score_current ${meanrawA} candidate ${meanrawB} candidate is ${meanrawA - meanrawB} faster`);
+          } else {
+            Logger.log(`score_current ${meanrawB} candidate ${meanrawB} candidate is ${meanrawB - meanrawA} faster`);
+          }
+
           let kept: boolean;
 
           if (

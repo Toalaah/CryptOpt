@@ -79,6 +79,7 @@ else if (parsedArgsFromCli.readState) {
 
   // // Restore some
   if (parsedArgsFromCli.continueRun) {
+    parsedArgs.optimizer = parsedArgsFromCli.optimizer;
     parsedArgs.dynamicOperationOrdering = parsedArgsFromCli.dynamicOperationOrdering;
     parsedArgs.single = parsedArgsFromCli.single;
     parsedArgs.seed = parsedArgsFromCli.seed;

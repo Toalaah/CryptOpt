@@ -139,7 +139,7 @@ export const makeArgs = () =>
     })
     .option("saMutStepSizeMax", {
       number: true,
-      default: 50,
+      default: 500,
       describe:
         "Maximum step size of mutations to perform when sampling a new neighbor. Higher values allow the optimizer to navigate the search space more quickly, at the expense of less local search. Leave unset for unrestricted maximum step size.",
       min: 0,

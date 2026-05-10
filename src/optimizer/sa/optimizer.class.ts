@@ -31,7 +31,6 @@ export class SAOptimizer extends Optimizer {
 
   private initialTemperature: number;
   private reannealThreshold: number;
-  private bestStalenessThreshold: number;
 
   private mutationStepSizeMin: number; // Min number of "steps" a single candidate shall take. Depends also on the current temperature.
   private mutationStepSizeMax: number; // Maximum number of "steps" a single candidate shall take. Depends also on the current temperature.
@@ -76,7 +75,6 @@ export class SAOptimizer extends Optimizer {
     }
 
     this.reannealThreshold = this.args.saReannealBaseThreshold;
-    this.bestStalenessThreshold = this.args.saBestStalenessThreshold;
   }
 
   private shouldAccept(currentEnergy: number, visitEnergy: number, temp: number) {
@@ -142,6 +140,7 @@ export class SAOptimizer extends Optimizer {
     // Used to track how/when we should reanneal.
     let annealingIndex = 0;
     let currentAnnealingCycleThreshold = this.reannealThreshold;
+    let currentStalenessThreshold = this.reannealThreshold / 2;
     let epochsSinceLastBestImprovement = 0;
 
     // Various helpers used in main optimization loop below.
@@ -176,7 +175,7 @@ export class SAOptimizer extends Optimizer {
 
     const shouldReanneal = () => {
       if (annealingIndex < currentAnnealingCycleThreshold) return false;
-      return epochsSinceLastBestImprovement >= this.bestStalenessThreshold;
+      return epochsSinceLastBestImprovement >= currentStalenessThreshold;
     };
 
     /**
@@ -208,7 +207,7 @@ export class SAOptimizer extends Optimizer {
         // Use Cauchy-Lorentz distribution, allows for occasional long tails to explore the search space more rapidly.
         const n = Math.abs(Math.round(cauchy({ loc: this.mutationStepSizeLoc, scale: scaledTemp })));
         const clamped = clamp(n, this.mutationStepSizeMin, this.mutationStepSizeMax);
-        if (clamped > this.mutationStats.maxMutStepSize) this.mutationStats.maxMutStepSize = clamped;
+        // if (clamped > this.mutationStats.maxMutStepSize) this.mutationStats.maxMutStepSize = clamped;
         Logger.log(
           `sampled neighbor ${slot} with step size of ${n} (clamped=${clamped}) (scale=${scaledTemp}, loc=${this.mutationStepSizeLoc})`,
         );
@@ -240,11 +239,11 @@ export class SAOptimizer extends Optimizer {
       }
 
       const intervalHandle = setInterval(() => {
-        temperature = this.coolingSchedule(annealingIndex) * Math.pow(0.90, this.mutationStats.numReanneals);
+        temperature = this.coolingSchedule(annealingIndex) * Math.pow(0.9, this.mutationStats.numReanneals);
         let wasNewCandidate = false;
         const currentEpoch = numEvals;
         if (temperature <= 0) errorOut({ exitCode: 123, msg: "temperature <= 0" });
-        FileLogger.log(`epoch ${currentEpoch}, temp=${temperature}`);
+        Logger.log(`epoch ${currentEpoch}, temp=${temperature}`);
 
         // Mutation & candidate generation.
         {
@@ -284,11 +283,6 @@ export class SAOptimizer extends Optimizer {
         const meanrawCandidate = analyseResult.rawMedian[CANDIDATE_FUNCTION];
         const meanrawCheck = analyseResult.rawMedian[CHECK];
 
-        // Logger.log(
-        //   `score_current ${meanrawCurrent} candidate ${meanrawCandidate} candidate is ${meanrawCurrent - meanrawCandidate} faster`,
-        // );
-
-        let didSeeBest = false;
         let didUpdateBest = false;
         for (let i = 0; i < analyseResult.rawMedian.length - 1; ++i) {
           const res = analyseResult.rawMedian[i];
@@ -296,7 +290,6 @@ export class SAOptimizer extends Optimizer {
           const cycleCount = analyseResult.batchSizeScaledrawMedian[i];
           const improved = updateBest({ asm: candidates[i].asm, ratio, cycleCount });
           if (improved) didUpdateBest = true;
-          didSeeBest = improved && CANDIDATE_FUNCTION === i;
         }
         if (didUpdateBest) {
           epochsSinceLastBestImprovement = 0;
@@ -322,7 +315,7 @@ export class SAOptimizer extends Optimizer {
           candidates[CURRENT_FUNCTION].ninst = candidates[CANDIDATE_FUNCTION].ninst;
           this.no_of_instructions = candidates[CANDIDATE_FUNCTION].ninst;
           Model.restoreSnapshot(CANDIDATE_FUNCTION.toString());
-          if (didSeeBest) {
+          if (didUpdateBest) {
             Model.saveSnaphot("best");
           }
         } else {
@@ -429,8 +422,14 @@ export class SAOptimizer extends Optimizer {
           this.mutationStats.numReanneals++;
           annealingIndex = 0;
           epochsSinceLastBestImprovement = 0;
-          // Model.restoreSnapshot("best");
           currentAnnealingCycleThreshold *= 2;
+          currentStalenessThreshold *= 2;
+        }
+
+        if (numEvals % 100 == 0) {
+          Logger.log("retesting best");
+          const res = this.objective.measure([xBestCycle.asm]);
+          xBestCycle.cycleCount = res.batchSizeScaledrawMedian[0];
         }
 
         // Start cleanup

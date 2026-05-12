@@ -140,7 +140,7 @@ export class SAOptimizer extends Optimizer {
     // Used to track how/when we should reanneal.
     let annealingIndex = 0;
     let currentAnnealingCycleThreshold = this.reannealThreshold;
-    let currentStalenessThreshold = this.reannealThreshold / 2;
+    let currentStalenessThreshold = this.reannealThreshold;
     let epochsSinceLastBestImprovement = 0;
 
     // Various helpers used in main optimization loop below.
@@ -423,7 +423,7 @@ export class SAOptimizer extends Optimizer {
           annealingIndex = 0;
           epochsSinceLastBestImprovement = 0;
           currentAnnealingCycleThreshold *= 2;
-          currentStalenessThreshold *= 2;
+          // currentStalenessThreshold *= 2;
         }
 
         if (numEvals % 100 == 0) {

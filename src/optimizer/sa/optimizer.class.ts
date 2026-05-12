@@ -52,6 +52,9 @@ export class SAOptimizer extends Optimizer {
     this.mutationStepSizeLoc = Math.round(this.args.saMutStepSizeLoc);
     this.mutationStepSizeMin = Math.round(this.args.saMutStepSizeMin);
     this.mutationStepSizeMax = Math.round(this.args.saMutStepSizeMax);
+    if (this.args.saMutStepSizeMax == 0) {
+      this.mutationStepSizeMax = Infinity;
+    }
     if (this.mutationStepSizeMin > this.mutationStepSizeMax)
       throw new Error(`min mut step size must be <= max mutstepsize`);
     if (
@@ -187,7 +190,7 @@ export class SAOptimizer extends Optimizer {
         xBestRatio.asm = state.asm;
         xBestRatio.ratio = state.ratio;
         xBestRatio.cycleCount = state.cycleCount;
-        // didUpdate = true;
+        didUpdate = true;
       }
       if (state.cycleCount <= xBestCycle.cycleCount) {
         xBestCycle.asm = state.asm;
@@ -207,7 +210,7 @@ export class SAOptimizer extends Optimizer {
         // Use Cauchy-Lorentz distribution, allows for occasional long tails to explore the search space more rapidly.
         const n = Math.abs(Math.round(cauchy({ loc: this.mutationStepSizeLoc, scale: scaledTemp })));
         const clamped = clamp(n, this.mutationStepSizeMin, this.mutationStepSizeMax);
-        // if (clamped > this.mutationStats.maxMutStepSize) this.mutationStats.maxMutStepSize = clamped;
+        if (clamped > this.mutationStats.maxMutStepSize) this.mutationStats.maxMutStepSize = clamped;
         Logger.log(
           `sampled neighbor ${slot} with step size of ${n} (clamped=${clamped}) (scale=${scaledTemp}, loc=${this.mutationStepSizeLoc})`,
         );

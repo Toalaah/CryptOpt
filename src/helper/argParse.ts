@@ -139,7 +139,7 @@ export const makeArgs = () =>
     })
     .option("saMutStepSizeMax", {
       number: true,
-      default: 500,
+      default: 0,
       describe:
         "Maximum step size of mutations to perform when sampling a new neighbor. Higher values allow the optimizer to navigate the search space more quickly, at the expense of less local search. Leave unset for unrestricted maximum step size.",
       min: 0,
@@ -168,7 +168,8 @@ export const makeArgs = () =>
     .option("saReannealBaseThreshold", {
       number: true,
       default: 1000,
-      describe: "Min number of epochs in an annealing cycle before reannealing is allowed. Doubles after each reanneal.",
+      describe:
+        "Min number of epochs in an annealing cycle before reannealing is allowed. Doubles after each reanneal.",
     })
     .option("saBestStalenessThreshold", {
       number: true,
@@ -355,7 +356,7 @@ export const makeArgs = () =>
         if (bridge == "manual" && (!jsonFile || !cFile)) {
           throw new Error("Bridge is set to manual, but either json or c file is not specified.");
         }
-        if (saMutStepSizeMin > saMutStepSizeMax) {
+        if (saMutStepSizeMin > saMutStepSizeMax && saMutStepSizeMax != 0) {
           throw new Error("--saMutStepSizeMin must be <= --saMutStepSizeMax");
         }
         if (["", "fiat"].includes(bridge)) {

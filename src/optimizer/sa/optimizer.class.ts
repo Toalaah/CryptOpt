@@ -425,7 +425,7 @@ export class SAOptimizer extends Optimizer {
           this.mutationStats.numReanneals++;
           annealingIndex = 0;
           epochsSinceLastBestImprovement = 0;
-          currentAnnealingCycleThreshold *= 2;
+          currentAnnealingCycleThreshold *= 1.6;
           // currentStalenessThreshold *= 2;
         }
 

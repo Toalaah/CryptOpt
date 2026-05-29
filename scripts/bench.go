@@ -26,7 +26,7 @@ import (
 
 var (
 	benchFile  = flag.String("f", "./scripts/benchmarks.yml", "path to the benchmark YAML file (env: $BENCHMARK_CONFIG)")
-	numWorkers = flag.Int("j", runtime.NumCPU(), "number of parallel jobs (CPUs to use) (env: $BENCHMARK_NUM_WORKERS)")
+	numWorkers = flag.Int("j", runtime.NumCPU()/2, "number of parallel jobs (CPUs to use) (env: $BENCHMARK_NUM_WORKERS)")
 	baseDir    = flag.String("b", ".", "relative path to where results should be stored (env: $BENCHMARK_BASE_DIR)")
 	cacheDir   = flag.String("c", "", "set a cache dir to store cryptopt temporaries in (env: $BENCHMARK_CACHE_DIR)")
 	seed       = flag.String("s", "", "set a fixed seed to use for all benchmark runs. Can be overwritten by setting the seed as a benchmark parameter (which takes precedence over this option). (env: $BENCHMARK_SEED)")
@@ -261,7 +261,7 @@ func worker(cpuID int, jobs <-chan Run, wg *sync.WaitGroup, total int, completed
 		tmpRun.ResultDir = tmpDir
 
 		cmdArgs := append(
-			[]string{"-c", strconv.Itoa(cpuID), *nodebin, "./dist/CryptOpt.js"},
+			[]string{"-c", strconv.Itoa(2 * cpuID), "./CryptOpt"},
 			tmpRun.cliArgs()...,
 		)
 		cmd := exec.Command("taskset", cmdArgs...)

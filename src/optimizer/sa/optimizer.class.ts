@@ -426,6 +426,7 @@ export class SAOptimizer extends Optimizer {
           annealingIndex = 0;
           epochsSinceLastBestImprovement = 0;
           currentAnnealingCycleThreshold *= 1.6;
+          Model.restoreSnapshot("best");
           // currentStalenessThreshold *= 2;
         }
 

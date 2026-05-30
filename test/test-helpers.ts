@@ -42,6 +42,7 @@ export function getTestArgs(filename: string): OptimizerArgs {
     evals: 1,
     seed: 11, //Date.now(),
     cyclegoal: 100,
+    schedulingAlgorithm: "default",
     logComment: "",
     proof: false,
     bridge: "fiat",

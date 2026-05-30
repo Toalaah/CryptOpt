@@ -164,6 +164,7 @@ function createMS(
       ...KNOWN_SYMBOLS[symbol],
       seed,
       memoryConstraints: "none",
+      schedulingAlgorithm: "default",
     }).measuresuite;
   }
 
@@ -181,6 +182,7 @@ function createMS(
     cFile: cFilename,
     seed,
     memoryConstraints: "none",
+    schedulingAlgorithm: "default",
   }).measuresuite;
 }
 

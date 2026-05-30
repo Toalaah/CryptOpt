@@ -46,6 +46,7 @@ afterAll(() => {
 });
 describe("RegisterAllocator:", () => {
   Model.init({
+    schedulingAlgorithm: "default",
     json: {
       operation: "fiat_curve25519_carry_mul",
       arguments: [

@@ -16,6 +16,7 @@
 
 import { OptimizerArgs } from "@/types";
 import { RLSOptimizer } from "@/optimizer/rls";
+import { SAOptimizer } from "@/optimizer/sa";
 
 export class OptimizerFactory {
   public static make(args: OptimizerArgs): Optimizer {
@@ -23,6 +24,7 @@ export class OptimizerFactory {
       case "rls":
         return new RLSOptimizer(args);
       case "sa":
+        return new SAOptimizer(args);
       default:
         throw new Error(`unknown optimizer strategy: ${args.optimizer}`);
     }

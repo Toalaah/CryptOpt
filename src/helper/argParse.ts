@@ -30,7 +30,14 @@ import {
 } from "@/bridge/fiat-bridge/constants";
 import { errorOut, ERRORS } from "@/errors";
 
-import { FRAME_POINTER_OPTIONS, MEMORY_CONSTRAINTS_OPTIONS, OPTIMIZERS, ParsedArgsT } from "../types";
+import {
+  FRAME_POINTER_OPTIONS,
+  MEMORY_CONSTRAINTS_OPTIONS,
+  OPTIMIZERS,
+  ParsedArgsT,
+  SA_COOLING_SCHEDULES,
+  SA_VISITING_DISTRIBUTIONS,
+} from "../types";
 
 const y = await yargs(process.argv.slice(2));
 
@@ -55,8 +62,47 @@ export const parsedArgs = y
     string: true,
     alias: "o",
     default: "rls",
+    describe: "Optimizer strategy to use.",
     choices: OPTIMIZERS,
   })
+  // START SA optimizer params.
+  .option("saInitialTemperature", {
+    number: true,
+    default: 5000,
+    min: 0,
+    describe: "Initial annealing temperature to use (has no effect if optimizer is not set to 'sa').",
+  })
+  .option("saStepSizeParam", {
+    number: true,
+    default: 1,
+    min: 1 + Number.EPSILON,
+    describe:
+      "Controls the visit parameter tuning the scale of the visiting distribution (has no effect if optimizer is not set to 'sa').",
+  })
+  .option("saAcceptParam", {
+    number: true,
+    default: 1.0,
+    describe: "Acceptance parameter value (has no effect if optimizer is not set to 'sa').",
+  })
+  .option("saGeoCoolingRate", {
+    number: true,
+    min: 0,
+    max: 1,
+    describe: "Cooling rate (alpha) to use when using geometric cooling schedule.",
+  })
+  .option("saVisitingDistribution", {
+    string: true,
+    default: "gaussian",
+    describe: "Visiting distribution to use (has no effect if optimizer is not set to 'sa').",
+    choices: SA_VISITING_DISTRIBUTIONS,
+  })
+  .option("saCoolingSchedule", {
+    string: true,
+    default: "log",
+    describe: "Cooling schedule to use (has no effect if optimizer is not set to 'sa').",
+    choices: SA_COOLING_SCHEDULES,
+  })
+  // END SA optimizer params.
   .option("bridge", {
     string: true,
     default: "fiat",
@@ -185,7 +231,7 @@ export const parsedArgs = y
       return Math.pow(1000, idx + 1) * Number(evals.substring(0, evals.length - 1));
     },
   })
-  .check(({ evals, bridge, cFile, jsonFile, method, curve }) => {
+  .check(({ evals, optimizer, bridge, cFile, jsonFile, method, curve }) => {
     if (evals <= 0) {
       throw new Error("--evals must be >0");
     }
@@ -225,4 +271,4 @@ export const parsedArgs = y
   .help("help")
   .alias("h", "help")
   .wrap(Math.min(160, y.terminalWidth()))
-  .parseSync() as ParsedArgsT;
+  .parseSync() as unknown as ParsedArgsT;

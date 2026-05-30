@@ -17,7 +17,6 @@
 import { execSync } from "child_process";
 import { appendFileSync, existsSync, rmSync } from "fs";
 import { Measuresuite } from "measuresuite";
-import { tmpdir } from "os";
 import { join, resolve as pathResolve } from "path";
 
 import { assemble } from "@/assembler";
@@ -44,6 +43,7 @@ import type { AnalyseResult, OptimizerArgs } from "@/types";
 
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "../optimizer.helper";
 import { init } from "../optimizer.helper.class";
+import { tmpdir } from "os";
 
 let choice: CHOICE;
 
@@ -62,7 +62,8 @@ export class RLSOptimizer implements Optimizer {
     Paul.seed = args.seed;
 
     const randomString = sha1Hash(Math.ceil(Date.now() * Math.random())).toString(36);
-    this.libcheckfunctionDirectory = join(tmpdir(), "CryptOpt.cache", randomString);
+    const cacheDir = args.cacheDir ?? tmpdir()
+    this.libcheckfunctionDirectory = join(cacheDir, "CryptOpt.cache", randomString);
 
     const { measuresuite, symbolname } = init(this.libcheckfunctionDirectory, args);
 

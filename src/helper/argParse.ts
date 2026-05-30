@@ -16,6 +16,7 @@
 
 import { uniq } from "lodash-es";
 import yargs from "yargs";
+import { tmpdir } from "node:os";
 
 import {
   AVAILABLE_METHODS as BITCOIN_CORE_METHODS,
@@ -204,6 +205,11 @@ export const parsedArgs = y
     default: "",
     describe: "May provide a hint of any kind to be printed on the status line",
   })
+  .option("cacheDir", {
+    string: true,
+    demandOption: false,
+    describe: "Specify cache dir to store temporary CryptOpt artifacts to.",
+  })
   .option("cyclegoal", {
     number: true,
     default: 10000,
@@ -231,7 +237,7 @@ export const parsedArgs = y
       return Math.pow(1000, idx + 1) * Number(evals.substring(0, evals.length - 1));
     },
   })
-  .check(({ evals, optimizer, bridge, cFile, jsonFile, method, curve }) => {
+  .check(({ evals, bridge, cFile, jsonFile, method, curve }) => {
     if (evals <= 0) {
       throw new Error("--evals must be >0");
     }

@@ -18,7 +18,7 @@ import { rm, writeFileSync } from "fs";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { CURVE_T } from "@/bridge/fiat-bridge";
-import { Optimizer } from "@/optimizer";
+import { OptimizerFactory } from "@/optimizer";
 import type { Fiat, OptimizerArgs } from "@/types";
 
 import { genTestFilename, getTestArgs, nothing } from "../test-helpers";
@@ -41,7 +41,7 @@ describe("manualBridge", () => {
     args.jsonFile = someJsonFilename;
     args.evals = 1000;
     expect(() => {
-      new Optimizer(args).optimise();
+      OptimizerFactory.make(args).optimise();
     }).to.throw();
   });
 
@@ -53,7 +53,7 @@ describe("manualBridge", () => {
       args.cFile = someCFilename;
       args.jsonFile = someJsonFilename;
       args.evals = 1000;
-      const opt = new Optimizer(args);
+      const opt = OptimizerFactory.make(args);
 
       try {
         opt.optimise().then((code) => {

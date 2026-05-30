@@ -39,6 +39,7 @@ export function getTestArgs(filename: string): OptimizerArgs {
   const resultDir = getTestResultsPath();
 
   return {
+    optimizer: "rls",
     evals: 1,
     seed: 11, //Date.now(),
     cyclegoal: 100,

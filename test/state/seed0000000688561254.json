@@ -1902,6 +1902,7 @@
   "time": { "validate": 0, "generateFiat": 0, "generateCryptopt": 0 },
   "parsedArgs": {
     "_": [],
+    "optimizer": "rls",
     "bridge": "fiat",
     "curve": "curve25519_solinas",
     "c": "curve25519_solinas",

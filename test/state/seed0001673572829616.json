@@ -701,6 +701,7 @@
   "time": { "validate": 3.0580000000000003, "generateFiat": 0, "generateCryptopt": -3.0130000000000003 },
   "parsedArgs": {
     "_": [],
+    "optimizer": "rls",
     "e": 49,
     "evals": 49,
     "v": true,

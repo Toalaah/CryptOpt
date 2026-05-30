@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-import type { SpyInstance } from "vitest";
+import type { Mock } from "vitest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { Optimizer } from "@/optimizer";
+import { OptimizerFactory } from "@/optimizer";
 
 import { getTestArgs } from "./test-helpers";
 
 describe("full tests fiat", () => {
-  let mockLog: SpyInstance;
-  let mockErr: SpyInstance;
+  let mockLog: Mock;
+  let mockErr: Mock;
   beforeAll(() => {
     const dofkall = (_msg: string) => {
       /*intentionally empty*/
@@ -44,11 +44,11 @@ describe("full tests fiat", () => {
 
   it("should only throw on invalid curves.", () => {
     expect(() => {
-      new Optimizer(args);
+      OptimizerFactory.make(args);
     }).not.toThrow();
 
     expect(() => {
-      new Optimizer(Object.assign({}, args, { curve: "INVALIDCURVE", method: "square" }));
+      OptimizerFactory.make(Object.assign({}, args, { curve: "INVALIDCURVE", method: "square" }));
     }).toThrow(/Cannot destructure property '.*' of '.*' as it is undefined./);
   });
 

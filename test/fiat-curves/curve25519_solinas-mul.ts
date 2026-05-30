@@ -17,7 +17,7 @@
 import { basename } from "path";
 import { afterAll, expect, it, vi } from "vitest";
 
-import { Optimizer } from "@/optimizer";
+import { OptimizerFactory } from "@/optimizer";
 
 import { getTestArgs, nothing } from "../test-helpers";
 
@@ -30,17 +30,19 @@ it("optimise", () => {
   return new Promise((resolve, reject) => {
     const filename = basename(import.meta.url);
     const args = getTestArgs(filename);
-    const opt = new Optimizer(args);
+    const opt = OptimizerFactory.make(args);
 
     try {
       expect(() =>
         opt.optimise().then((code) => {
           expect(code).toEqual(0);
+          expect(mockErr).not.toHaveBeenCalled();
           resolve(0);
         }),
       ).not.toThrow();
       vi.runAllTimers();
     } catch (e) {
+      mockErr.mockRestore();
       console.error(e);
       reject(e);
     }

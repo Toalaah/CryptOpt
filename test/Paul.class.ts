@@ -69,4 +69,46 @@ describe("Paul", () => {
       expect(right / limit).toBeGreaterThan(max - delta / 5);
     });
   });
+
+  describe("sampleGaussian", () => {
+    it("should return a deterministic value for the same seed", () => {
+      Paul.seed = 42;
+      const first = Paul.sampleGaussian(0, 1);
+      Paul.seed = 42;
+      const second = Paul.sampleGaussian(0, 1);
+      expect(first).toEqual(second);
+    });
+
+    it("should return different values for different seeds", () => {
+      Paul.seed = 1;
+      const a = Paul.sampleGaussian(0, 1);
+      Paul.seed = 2;
+      const b = Paul.sampleGaussian(0, 1);
+      expect(a).not.toEqual(b);
+    });
+
+    it("should center samples around the given mean", () => {
+      const mean = 5;
+      const N = 10_000;
+      Paul.seed = 123;
+      let sum = 0;
+      for (let i = 0; i < N; i++) {
+        sum += Paul.sampleGaussian(mean, 1);
+      }
+      expect(sum / N).toBeCloseTo(mean, 0);
+    });
+
+    it("should scale sample spread by the given stdev", () => {
+      const stdev = 3;
+      const N = 10_000;
+      Paul.seed = 456;
+      const samples: number[] = [];
+      for (let i = 0; i < N; i++) {
+        samples.push(Paul.sampleGaussian(0, stdev));
+      }
+      const sampleMean = samples.reduce((a, b) => a + b, 0) / N;
+      const variance = samples.reduce((acc, x) => acc + (x - sampleMean) ** 2, 0) / N;
+      expect(Math.sqrt(variance)).toBeCloseTo(stdev, 0);
+    });
+  });
 });

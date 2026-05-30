@@ -138,6 +138,22 @@ export class Paul {
   }
 
   /**
+   * Returns a uniform number in [0,1].
+   */
+  public static uniform(): number {
+    Paul.updateState();
+    const n = (Paul.getInstance()._state * 2) / Number.MAX_SAFE_INTEGER;
+    return n;
+  }
+
+  public static sampleGaussian(mean: number, stdev: number): number {
+    const u = 1 - Paul.uniform();
+    const v = Paul.uniform();
+    const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    return z * stdev + mean;
+  }
+
+  /**
    * will splice (remove and return) one random element
    * from @param arr
    */

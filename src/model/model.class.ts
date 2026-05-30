@@ -41,6 +41,7 @@ import type { CryptOpt, MEMORY_CONSTRAINTS_OPTIONS_T } from "@/types";
 
 import { createDependencyRelation, nodeLookupMap } from "./model.helper";
 
+type Backup = { nodes: Readonly<CryptOpt.StringOperation>[]; order: number[] };
 type methodParam = CryptOpt.Function["arguments"][number] | CryptOpt.Function["returns"][number];
 export class Model {
   // this is set once.
@@ -166,6 +167,11 @@ export class Model {
 
   // for debugging
   public static get order(): string {
+    return JSON.stringify(Model._order);
+  }
+
+  // also for debugging
+  public static get orderStr(): string {
     return JSON.stringify(Model._order);
   }
 
@@ -386,7 +392,35 @@ export class Model {
     return true;
   }
 
-  private backup: { nodes: Readonly<CryptOpt.StringOperation>[]; order: number[] } = {
+  private snapshots: { [key: string]: Backup } = {};
+
+  private _saveSnaphot(id: string) {
+    Logger.log(`saving model snapshot: '${id}'`);
+    const nodes = cloneDeep(Model._nodes);
+    const order = cloneDeep(Model._order);
+    this.snapshots[id] = { nodes, order };
+  }
+
+  public static saveSnaphot(id: string) {
+    const m = Model.getInstance();
+    m._saveSnaphot(id);
+  }
+
+  private _restoreSnapshot(id: string) {
+    const state = this.snapshots[id];
+    Logger.log(`restoring model snapshot: '${id}' (${state})`);
+    if (state === undefined) throw new Error(`no such snapshot with id: '${id}'`);
+    Model._nodes = state.nodes;
+    Model._order = state.order;
+    this._currentReadOrderIsValid = false;
+  }
+
+  public static restoreSnapshot(id: string) {
+    const m = Model.getInstance();
+    m._restoreSnapshot(id);
+  }
+
+  private backup: Backup = {
     nodes: [],
     order: [],
   };

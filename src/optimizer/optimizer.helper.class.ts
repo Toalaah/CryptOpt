@@ -25,7 +25,7 @@ import { ManualBridge } from "@/bridge/manual-bridge";
 import { Model } from "@/model";
 import { OptimizerArgs } from "@/types";
 
-type needComms = Pick<OptimizerArgs, "bridge" | "seed" | "memoryConstraints">;
+type needComms = Pick<OptimizerArgs, "bridge" | "seed" | "memoryConstraints" | "schedulingAlgorithm">;
 interface needJasmin extends needComms {
   bridge: "jasmin";
 }
@@ -60,6 +60,7 @@ function initFiat(sharedObjectFilename: string, args: needFiat): ret {
   Model.init({
     memoryConstraints: args.memoryConstraints,
     json: bridge.getCryptOptFunction(args.method, args.curve),
+    schedulingAlgorithm: args.schedulingAlgorithm,
   });
 
   const symbolname = bridge.machinecode(sharedObjectFilename, args.method, args.curve);
@@ -77,6 +78,7 @@ function initBitcoinCore(sharedObjectFilename: string, args: needBitcoinCore): r
   Model.init({
     memoryConstraints: args.memoryConstraints,
     json: bridge.getCryptOptFunction(args.method),
+    schedulingAlgorithm: args.schedulingAlgorithm,
   });
 
   const symbolname = bridge.machinecode(sharedObjectFilename, args.method);
@@ -95,6 +97,7 @@ function initJasmin(sharedObjectFilename: string, args: needJasmin): ret {
   Model.init({
     memoryConstraints: args.memoryConstraints,
     json: bridge.getCryptOptFunction(),
+    schedulingAlgorithm: args.schedulingAlgorithm,
   });
 
   const symbolname = bridge.machinecode(sharedObjectFilename);
@@ -118,6 +121,7 @@ function initManual(sharedObjectFilename: string, args: needManual): ret {
   Model.init({
     memoryConstraints: args.memoryConstraints,
     json: bridge.getCryptOptFunction(),
+    schedulingAlgorithm: args.schedulingAlgorithm,
   });
   const symbolname = bridge.machinecode(sharedObjectFilename);
   const chunksize = 16; // only for reading the chunk breaks atm. see MS code

@@ -30,7 +30,12 @@ import {
 } from "@/bridge/fiat-bridge/constants";
 import { errorOut, ERRORS } from "@/errors";
 
-import { FRAME_POINTER_OPTIONS, MEMORY_CONSTRAINTS_OPTIONS, ParsedArgsT } from "../types";
+import {
+  FRAME_POINTER_OPTIONS,
+  MEMORY_CONSTRAINTS_OPTIONS,
+  ParsedArgsT,
+  SCHEDULING_ALGORITHM_OPTIONS,
+} from "../types";
 
 const y = await yargs(process.argv.slice(2));
 
@@ -136,6 +141,12 @@ export const parsedArgs = y
     describe:
       "If this is set, CryptOpt will prefer spilling into vector registers as long as they are available, then start spilling into memory. Must specify --xmm switch, too. It will not try to optimize on it. (i.e. The first 16 values to be spilled will be spilled into XMMs, the rest into memory.)",
     boolean: true,
+  })
+  .option("schedulingAlgorithm", {
+    string: true,
+    default: "default",
+    describe: "Instruction scheduling algorithm to use when constructing initial model node order.",
+    choices: SCHEDULING_ALGORITHM_OPTIONS,
   })
   .option("readState", {
     string: true,

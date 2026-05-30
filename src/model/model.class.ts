@@ -37,9 +37,9 @@ import {
 import globals from "@/helper/globals";
 import Logger from "@/helper/Logger.class";
 import { BIAS, Paul } from "@/paul";
-import type { CryptOpt, MEMORY_CONSTRAINTS_OPTIONS_T } from "@/types";
+import type { CryptOpt, MEMORY_CONSTRAINTS_OPTIONS_T, SCHEDULING_ALGORITHM_OPTIONS_T } from "@/types";
 
-import { createDependencyRelation, nodeLookupMap } from "./model.helper";
+import { createDependencyRelation, nodeLookupMap, reorderPressureMinimizing } from "./model.helper";
 
 type methodParam = CryptOpt.Function["arguments"][number] | CryptOpt.Function["returns"][number];
 export class Model {
@@ -118,9 +118,11 @@ export class Model {
   public static init({
     json,
     memoryConstraints,
+    schedulingAlgorithm,
   }: {
     json: CryptOpt.Function;
     memoryConstraints: MEMORY_CONSTRAINTS_OPTIONS_T;
+    schedulingAlgorithm: SCHEDULING_ALGORITHM_OPTIONS_T;
   }): void {
     Model._methodParameters = json.returns;
     Model._methodParameters = Model._methodParameters.concat(json.arguments);
@@ -140,6 +142,26 @@ export class Model {
     Model._nodeLookupMap = nodeLookupMap(Model._nodes);
     Model._neededBy = createDependencyRelation(Model._nodes, Model._nodeLookupMap, memoryConstraints);
     Model._order = toposort(Model._nodes, Model._neededBy);
+
+    switch (schedulingAlgorithm) {
+      case "default":
+        break;
+      case "pressure-minimizing-longest":
+        Model._order = reorderPressureMinimizing(
+          Model.nodesInTopologicalOrder,
+          Model._nodeLookupMap,
+          Model._order,
+          { tieBreaker: "longest" },
+        );
+      case "pressure-minimizing-shortest":
+        Model._order = reorderPressureMinimizing(
+          Model.nodesInTopologicalOrder,
+          Model._nodeLookupMap,
+          Model._order,
+          { tieBreaker: "shortest" },
+        );
+    }
+
     Logger.log(Model._order.join(" @ "));
     Logger.log(
       Model.nodesInTopologicalOrder
@@ -162,6 +184,10 @@ export class Model {
 
   public static get nodeSetLength(): number {
     return Model._nodes.length;
+  }
+
+  public static get nodeLookupMap(): ReadonlyMap<string, number> {
+    return Model._nodeLookupMap;
   }
 
   // for debugging

@@ -61,7 +61,8 @@ export class Optimizer {
     Paul.seed = args.seed;
 
     const randomString = sha1Hash(Math.ceil(Date.now() * Math.random())).toString(36);
-    this.libcheckfunctionDirectory = join(tmpdir(), "CryptOpt.cache", randomString);
+    const cacheDir = args.cacheDir ?? tmpdir();
+    this.libcheckfunctionDirectory = join(cacheDir, "CryptOpt.cache", randomString);
 
     const { measuresuite, symbolname } = init(this.libcheckfunctionDirectory, args);
 

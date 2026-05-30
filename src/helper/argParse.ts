@@ -152,6 +152,11 @@ export const parsedArgs = y
     default: "",
     describe: "May provide a hint of any kind to be printed on the status line",
   })
+  .option("cacheDir", {
+    string: true,
+    demandOption: false,
+    describe: "Specify cache dir to store temporary CryptOpt artifacts to.",
+  })
   .option("cyclegoal", {
     number: true,
     default: 10000,

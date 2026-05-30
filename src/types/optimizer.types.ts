@@ -26,6 +26,7 @@ export type OptimizerArgs = {
   method: METHOD_T;
   cyclegoal: number;
   readState?: string; // filename
+  cacheDir?: string;
   logComment: string;
   proof: boolean;
   verbose: boolean;

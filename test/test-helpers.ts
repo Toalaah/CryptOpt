@@ -41,9 +41,11 @@ export function getTestArgs(filename: string): OptimizerArgs {
   return {
     optimizer: "rls",
     saInitialTemperature: 0,
-    saVisitParam: 0,
+    saStepSizeParam: 0,
+    saGeoCoolingRate: 0.5,
     saAcceptParam: 0,
     saCoolingSchedule: "log",
+    saVisitingDistribution: "gaussian",
     evals: 1,
     seed: 11, //Date.now(),
     cyclegoal: 100,

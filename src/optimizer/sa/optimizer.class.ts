@@ -20,9 +20,9 @@ import { Measuresuite } from "measuresuite";
 import { tmpdir } from "os";
 import { join, resolve as pathResolve } from "path";
 
-import { assemble } from "@/assembler";
+import { assemble as assembleASM, strip } from "@/assembler";
 import { FiatBridge } from "@/bridge/fiat-bridge";
-import { CHOICE, FUNCTIONS } from "@/enums";
+import { CHOICE } from "@/enums";
 import { errorOut, ERRORS } from "@/errors";
 import {
   analyseMeasureResult,
@@ -31,7 +31,6 @@ import {
   padSeed,
   PRINT_EVERY,
   shouldProof,
-  toggleFUNCTIONS,
   writeString,
 } from "@/helper";
 import globals from "@/helper/globals";
@@ -53,9 +52,10 @@ export class SAOptimizer implements Optimizer {
   private symbolname: string;
 
   private initialTemperature: number;
-  private acceptParam: number;
+  private acceptCriteria: AcceptCriteria;
   private coolingSchedule: CoolingSchedule;
   private visitingDistribution: VisitingDistribution;
+  private reannealCriteria: ReannealCriteria;
 
   public getSymbolname(deleteCache = false): string {
     if (deleteCache) {
@@ -87,7 +87,11 @@ export class SAOptimizer implements Optimizer {
 
     // Set SA algorithm args
     this.initialTemperature = this.args.saInitialTemperature;
-    this.acceptParam = this.args.saAcceptParam;
+
+    // TODO: change these hard-coded criteria
+    this.acceptCriteria = makeBinaryAcceptanceCriteria(this.args.saAcceptParam);
+    this.reannealCriteria = makeNoOpReannealCriteria();
+
     switch (this.args.saCoolingSchedule) {
       case "lin":
         this.coolingSchedule = makeLinCoolingSchedule(this.initialTemperature);
@@ -101,12 +105,13 @@ export class SAOptimizer implements Optimizer {
       default:
         throw new Error(`unknown cooling schedule: ${this.args.saCoolingSchedule}`);
     }
+
     switch (this.args.saVisitingDistribution) {
       case "gaussian":
         this.visitingDistribution = makeGaussianVisitingDistribution(this.args.saStepSizeParam);
         break;
       case "cauchy":
-        this.visitingDistribution = makeLogCoolingSchedule(this.args.saStepSizeParam);
+        this.visitingDistribution = makeCauchyVisitingDistribution(this.args.saStepSizeParam);
         break;
       case "boltzmann":
         this.visitingDistribution = makeBoltzmanVisitingDistribution(this.args.saStepSizeParam);
@@ -117,10 +122,7 @@ export class SAOptimizer implements Optimizer {
   }
 
   private no_of_instructions = -1;
-  private asmStrings: { [k in FUNCTIONS]: string } = {
-    [FUNCTIONS.F_A]: "",
-    [FUNCTIONS.F_B]: "",
-  };
+
   private numMut: { [id: string]: number } = {
     permutation: 0,
     decision: 0,
@@ -130,9 +132,6 @@ export class SAOptimizer implements Optimizer {
     decision: 0,
   };
 
-  private revertFunction = (): void => {
-    /**intentionally blank */
-  };
   /** you usually don't want to mess with @param random.
    * mutate should not be called from outside with @param random=false*/
   private mutate(random = true): void {
@@ -143,10 +142,6 @@ export class SAOptimizer implements Optimizer {
     switch (choice) {
       case CHOICE.PERMUTE: {
         Model.mutatePermutation();
-        this.revertFunction = () => {
-          this.numRevert.permutation++;
-          Model.revertLastMutation();
-        };
         this.numMut.permutation++;
         break;
       }
@@ -158,17 +153,51 @@ export class SAOptimizer implements Optimizer {
           this.mutate(false);
           return;
         }
-        this.revertFunction = () => {
-          this.numRevert.decision++;
-          Model.revertLastMutation();
-        };
-
         this.numMut.decision++;
       }
     }
   }
 
   public optimise() {
+    type Candidate = {
+      asm: string;
+      stacklength: number;
+      length: number;
+    };
+
+    const CURRENT_FUNCTION = 0 as const;
+    const CANDIDATE_FUNCTION = 1 as const;
+    const candidates = new Array<Candidate>(2);
+    for (let i = 0; i < candidates.length; ++i) {
+      candidates[i] = { asm: "", stacklength: -1, length: -1 };
+    }
+
+    const assemble = (slot: number) => {
+      Logger.log("assembling");
+      const assembleResult = assembleASM(this.args.resultDir);
+      const code = assembleResult.code;
+      const filteredInstructions = strip(code);
+      const slotId = slot == CURRENT_FUNCTION ? "A" : "B";
+      const asm = (() => {
+        switch (this.args.verbose) {
+          case true:
+            const c = code.join("\n");
+            writeString(pathResolve(this.libcheckfunctionDirectory, `current${slotId}.asm`), c);
+            return c;
+          case false:
+            return filteredInstructions.join("\n");
+        }
+      })();
+      candidates[slot].asm = asm;
+      candidates[slot].stacklength = assembleResult.stacklength;
+      candidates[slot].length = filteredInstructions.length;
+    };
+
+    const sampleNeighbor = (slot: number) => {
+      this.mutate();
+      assemble(slot);
+    };
+
     return new Promise<number>((resolve) => {
       Logger.log("starting sa optimisation");
       printStartInfo({
@@ -180,270 +209,236 @@ export class SAOptimizer implements Optimizer {
       const numBatches = 31;
       let ratioString = "";
       let numEvals = 0;
+      let temperatureIndex = 0;
 
       const optimistaionStartDate = Date.now();
       let accumulatedTimeSpentByMeasuring = 0;
 
-      let currentNameOfTheFunctionThatHasTheMutation = FUNCTIONS.F_A;
       let time = Date.now();
       let show_per_second = "many/s";
       let per_second_counter = 0;
 
+      // Before running the optimization loop, assemble the baseline program (at this point, no mutations have taken place).
+      {
+        assemble(CURRENT_FUNCTION);
+        const { asm, stacklength, length } = candidates[CURRENT_FUNCTION];
+        // Check for errors, if nothing happens here we are probably fine for the rest of the run.
+        if (asm === "" || stacklength === -1 || length === -1 || asm.includes("undefined"))
+          errorOut({ msg: "ASM string empty/undefined, big yikes", exitCode: 1 });
+        this.no_of_instructions = length;
+      }
+
       // Actual optimization loop starts here.
       const intervalHandle = setInterval(() => {
-        let temperature = this.coolingSchedule(numEvals);
-        if (temperature < 0) errorOut({ exitCode: 123, msg: "temperature < 0" });
+        let temperature = this.coolingSchedule(temperatureIndex);
+        if (Math.sign(temperature) < 0) errorOut({ exitCode: 123, msg: "negative temperature" });
 
-        if (numEvals > 0) {
-          // not first eval, thus we want to mutate.
-          this.mutate();
-        }
+        // Always save current state before sampling.
+        Model.saveSnaphot(CURRENT_FUNCTION.toString());
+        // Current model state is now mutated variant.
+        sampleNeighbor(CANDIDATE_FUNCTION);
 
-        Logger.log("assembling");
-        const { code, stacklength } = assemble(this.args.resultDir);
+        const now_measure = Date.now();
 
-        Logger.log("now we have the current string in the object, filtering");
-        const filteredInstructions = code.filter((line) => line && !line.startsWith(";") && line !== "\n");
-        this.no_of_instructions = filteredInstructions.length;
+        let analyseResult: AnalyseResult | undefined;
+        try {
+          Logger.log("let the measurements begin!");
+          // here we need the barriers
+          const results = this.measuresuite.measure(batchSize, numBatches, [
+            candidates[CURRENT_FUNCTION].asm,
+            candidates[CANDIDATE_FUNCTION].asm,
+          ]);
+          Logger.log("well done guys. The results are in!");
 
-        // and depening on the silent-opt use filtered or the verbose ones for the string
-        if (this.args.verbose) {
-          const c = code.join("\n");
-          writeString(pathResolve(this.libcheckfunctionDirectory, "current.asm"), c);
-          this.asmStrings[currentNameOfTheFunctionThatHasTheMutation] = c;
-        } else {
-          this.asmStrings[currentNameOfTheFunctionThatHasTheMutation] = filteredInstructions.join("\n");
-        }
+          accumulatedTimeSpentByMeasuring += Date.now() - now_measure;
 
-        // check if this was the first round
-        if (numEvals == 0) {
-          // then point to fB and continue, write first
-          if (this.asmStrings[FUNCTIONS.F_A].includes("undefined")) {
-            const p = pathResolve(this.libcheckfunctionDirectory, "with_undefined.asm");
-            writeString(p, this.asmStrings[FUNCTIONS.F_A]);
+          analyseResult = analyseMeasureResult(results, { batchSize, resultDir: this.args.resultDir });
 
-            const e = `\n\n\nNah... we dont want undefined; wrote ${p}, plx fix. \n\n\n`;
-            console.error(e);
-            throw new Error(e);
-          }
-          currentNameOfTheFunctionThatHasTheMutation = FUNCTIONS.F_B;
-          numEvals++;
-        } else {
-          //else, it was not the first round, we need to measure
-
-          const now_measure = Date.now();
-
-          let analyseResult: AnalyseResult | undefined;
-          try {
-            Logger.log("let the measurements begin!");
-            if (this.args.verbose) {
-              writeString(
-                pathResolve(this.libcheckfunctionDirectory, "currentA.asm"),
-                this.asmStrings[FUNCTIONS.F_A],
-              );
-              writeString(
-                pathResolve(this.libcheckfunctionDirectory, "currentB.asm"),
-                this.asmStrings[FUNCTIONS.F_B],
-              );
-            }
-            // here we need the barriers
-            const results = this.measuresuite.measure(batchSize, numBatches, [
-              this.asmStrings[FUNCTIONS.F_A],
-              this.asmStrings[FUNCTIONS.F_B],
-            ]);
-            Logger.log("well done guys. The results are in!");
-
-            accumulatedTimeSpentByMeasuring += Date.now() - now_measure;
-
-            analyseResult = analyseMeasureResult(results, { batchSize, resultDir: this.args.resultDir });
-
-            //TODO increase numBatches, if the times have a big stddeviation
-            //TODO change batchSize if the avg number is batchSize *= avg(times)/goal ; goal=10000 cycles
-          } catch (e) {
-            const isIncorrect = e instanceof Error && e.message.includes("tested_incorrect");
-            const isInvalid = e instanceof Error && e.message.includes("could not be assembled");
-            if (isInvalid || isIncorrect) {
-              writeString(
-                join(this.args.resultDir, "tested_incorrect_A.asm"),
-                this.asmStrings[FUNCTIONS.F_A],
-              );
-              writeString(
-                join(this.args.resultDir, "tested_incorrect_B.asm"),
-                this.asmStrings[FUNCTIONS.F_B],
-              );
-              writeString(
-                join(this.args.resultDir, "tested_incorrect.json"),
-                JSON.stringify({
-                  nodes: Model.nodesInTopologicalOrder,
-                }),
-              );
-            }
-
-            if (isIncorrect) {
-              errorOut(ERRORS.measureIncorrect);
-            }
-            if (isInvalid) {
-              errorOut(ERRORS.measureInvalid);
-            }
-            writeString(join(this.args.resultDir, "generic_error_A.asm"), this.asmStrings[FUNCTIONS.F_A]);
-            writeString(join(this.args.resultDir, "generic_error_B.asm"), this.asmStrings[FUNCTIONS.F_B]);
-            errorOut(ERRORS.measureGeneric);
-          }
-
-          const [meanrawA, meanrawB, meanrawCheck] = analyseResult.rawMedian;
-
-          batchSize = Math.ceil((Number(this.args.cyclegoal) / meanrawCheck) * batchSize);
-          // We want to limit for some corner cases.
-          batchSize = Math.min(batchSize, 10000);
-          batchSize = Math.max(batchSize, 5);
-
-          const currentFunctionIsA = () => currentNameOfTheFunctionThatHasTheMutation === FUNCTIONS.F_A;
-
-          Logger.log(currentFunctionIsA() ? "New".padEnd(10) : "New".padStart(10));
-
-          let kept: boolean;
-
-          if (
-            // A is not worse and A is new
-            (meanrawA <= meanrawB && currentFunctionIsA()) ||
-            // or B is not worse and B is new
-            (meanrawA >= meanrawB && !currentFunctionIsA())
-          ) {
-            Logger.log("kept    mutation");
-            kept = true;
-            currentNameOfTheFunctionThatHasTheMutation = toggleFUNCTIONS(
-              currentNameOfTheFunctionThatHasTheMutation,
-            );
-          } else {
-            // revert
-            kept = false;
-            this.revertFunction();
-          }
-          const indexGood = Number(meanrawA > meanrawB);
-          const indexBad = 1 - indexGood;
-          globals.currentRatio = meanrawCheck / Math.min(meanrawB, meanrawA);
-
-          const goodChunks = analyseResult.chunks[indexGood];
-          const badChunks = analyseResult.chunks[indexBad];
-
-          ratioString = globals.currentRatio /*aka: new ratio*/
-            .toFixed(4);
-
-          per_second_counter++;
-          if (Date.now() - time > 1000) {
-            time = Date.now();
-            show_per_second = (per_second_counter + "/s").padStart(6);
-            per_second_counter = 0;
-          }
-
-          logMutation({ choice, kept, numEvals });
-          if (numEvals % PRINT_EVERY == 0) {
-            // print every 10th eval
-            // a line every 5% (also to logfile) also write the asm when
-            const writeout = numEvals % (this.args.evals / LOG_EVERY) === 0;
-
-            const statusline = genStatusLine({
-              ...this.args,
-              analyseResult,
-              logComment: this.args.logComment + ` temp=${temperature.toFixed(2)}`,
-              badChunks,
-              batchSize,
-              choice,
-              goodChunks,
-              indexBad,
-              indexGood,
-              kept,
-              no_of_instructions: this.no_of_instructions,
-              numEvals,
-              ratioString,
-              show_per_second,
-              stacklength,
-              symbolname: this.symbolname,
-              writeout,
-            });
-            process.stdout.write(statusline);
-
-            globals.convergence.push(ratioString);
-          }
-
-          // Increase  Number of evaluations taken.
-          numEvals++;
-
-          if (numEvals >= this.args.evals) {
-            // DONE WITH OPTIMISING WRITE EVERYTHING TO DISK AND EXIT.
-            globals.time.generateCryptopt =
-              (Date.now() - optimistaionStartDate) / 1000 - globals.time.validate;
-            clearInterval(intervalHandle);
-
-            Logger.log("writing current asm");
-            const elapsed = Date.now() - optimistaionStartDate;
-            const paddedSeed = padSeed(Paul.initialSeed);
-
-            const statistics = genStatistics({
-              paddedSeed,
-              ratioString,
-              evals: this.args.evals,
-              elapsed,
-              batchSize,
-              numBatches,
-              acc: accumulatedTimeSpentByMeasuring,
-              numRevert: this.numRevert,
-              numMut: this.numMut,
-              counter: this.measuresuite.timer,
-              framePointer: this.args.framePointer,
-              memoryConstraints: this.args.memoryConstraints,
-              cyclegoal: this.args.cyclegoal,
-            });
-            Logger.log(statistics);
-
-            const [asmFile, mutationsCsvFile] = generateResultFilename(
-              { ...this.args, symbolname: this.symbolname },
-              [`_ratio${ratioString.replace(".", "")}.asm`, `.csv`],
-            );
-
-            // write best found solution with headers
-            // flip, because we want the last accepted, not the last mutated.
-            const flipped = toggleFUNCTIONS(currentNameOfTheFunctionThatHasTheMutation);
-
+          //TODO increase numBatches, if the times have a big stddeviation
+          //TODO change batchSize if the avg number is batchSize *= avg(times)/goal ; goal=10000 cycles
+        } catch (e) {
+          const isIncorrect = e instanceof Error && e.message.includes("tested_incorrect");
+          const isInvalid = e instanceof Error && e.message.includes("could not be assembled");
+          if (isInvalid || isIncorrect) {
             writeString(
-              asmFile,
-              ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
-                .concat(this.asmStrings[flipped])
-                .concat(statistics)
-                .join("\n"),
+              join(this.args.resultDir, "tested_incorrect_A.asm"),
+              candidates[CURRENT_FUNCTION].asm,
             );
-
-            // writing the CSV
-            writeString(mutationsCsvFile, globals.mutationLog.join("\n"));
-
-            if (shouldProof(this.args)) {
-              // and proof correct
-              const proofCmd = FiatBridge.buildProofCommand(this.args.curve, this.args.method, asmFile);
-              Logger.log(`proofing that asm correct with '${proofCmd}'`);
-              try {
-                const now = Date.now();
-                execSync(proofCmd, { shell: "/usr/bin/bash" });
-                const timeForValidation = (Date.now() - now) / 1000;
-                appendFileSync(asmFile, `\n; validated in ${timeForValidation}s\n`);
-                globals.time.validate += timeForValidation;
-              } catch (e) {
-                console.error(`tried to prove correct. didnt work. I tried ${proofCmd}`);
-                errorOut(ERRORS.proofUnsuccessful);
-              }
-            }
-            Logger.log("done with that current price of assembly code.");
-            this.cleanLibcheckfunctions();
-            const v = this.measuresuite.destroy();
-            Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
-
-            resolve(0);
+            writeString(
+              join(this.args.resultDir, "tested_incorrect_B.asm"),
+              candidates[CANDIDATE_FUNCTION].asm,
+            );
+            writeString(
+              join(this.args.resultDir, "tested_incorrect.json"),
+              JSON.stringify({
+                nodes: Model.nodesInTopologicalOrder,
+              }),
+            );
           }
+
+          if (isIncorrect) {
+            errorOut(ERRORS.measureIncorrect);
+          }
+          if (isInvalid) {
+            errorOut(ERRORS.measureInvalid);
+          }
+          writeString(join(this.args.resultDir, "generic_error_A.asm"), candidates[CURRENT_FUNCTION].asm);
+          writeString(join(this.args.resultDir, "generic_error_B.asm"), candidates[CANDIDATE_FUNCTION].asm);
+          errorOut(ERRORS.measureGeneric);
+        }
+
+        const [meanrawCurrent, meanrawCandidate, meanrawCheck] = analyseResult.rawMedian;
+
+        batchSize = Math.ceil((Number(this.args.cyclegoal) / meanrawCheck) * batchSize);
+        // We want to limit for some corner cases.
+        batchSize = Math.min(batchSize, 10000);
+        batchSize = Math.max(batchSize, 5);
+        let kept: boolean;
+        const shouldAccept = this.acceptCriteria(meanrawCurrent, meanrawCandidate, temperature);
+        if (shouldAccept) {
+          // After mutation, model state is currently already the mutated variant. In that case, there is nothing to do except set the current solution's ASM to the candidate.
+          // No need to save snapshot to "current" as we will do that first thing in the next round.
+          Logger.log("kept mutation");
+          kept = true;
+          candidates[CURRENT_FUNCTION].asm = candidates[CANDIDATE_FUNCTION].asm;
+          candidates[CURRENT_FUNCTION].stacklength = candidates[CANDIDATE_FUNCTION].stacklength;
+          candidates[CURRENT_FUNCTION].length = candidates[CANDIDATE_FUNCTION].length;
+          this.no_of_instructions = candidates[CANDIDATE_FUNCTION].length;
+        } else {
+          // revert
+          kept = false;
+          // Pop back to previous model state.
+          Model.restoreSnapshot(CURRENT_FUNCTION.toString());
+        }
+        const indexGood = kept ? CANDIDATE_FUNCTION : CURRENT_FUNCTION;
+        const indexBad = kept ? CURRENT_FUNCTION : CANDIDATE_FUNCTION;
+        globals.currentRatio = meanrawCheck / Math.min(meanrawCandidate, meanrawCurrent);
+        const stacklength = candidates[indexGood].stacklength;
+
+        const goodChunks = analyseResult.chunks[indexGood];
+        const badChunks = analyseResult.chunks[indexBad];
+
+        ratioString = globals.currentRatio /*aka: new ratio*/
+          .toFixed(4);
+
+        per_second_counter++;
+        if (Date.now() - time > 1000) {
+          time = Date.now();
+          show_per_second = (per_second_counter + "/s").padStart(6);
+          per_second_counter = 0;
+        }
+
+        logMutation({ choice, kept, numEvals });
+        if (numEvals % PRINT_EVERY == 0) {
+          // print every 10th eval
+          // a line every 5% (also to logfile) also write the asm when
+          const writeout = numEvals % (this.args.evals / LOG_EVERY) === 0;
+
+          const statusline = genStatusLine({
+            ...this.args,
+            analyseResult,
+            logComment: this.args.logComment + ` temp=${temperature.toFixed(2)}`,
+            badChunks,
+            batchSize,
+            choice,
+            goodChunks,
+            indexBad,
+            indexGood,
+            kept,
+            no_of_instructions: this.no_of_instructions,
+            numEvals,
+            ratioString,
+            show_per_second,
+            stacklength,
+            symbolname: this.symbolname,
+            writeout,
+          });
+          process.stdout.write(statusline);
+
+          globals.convergence.push(ratioString);
+        }
+
+        // Increase  Number of evaluations taken.
+        numEvals++;
+        // Also the temperature index
+        temperatureIndex++;
+
+        const shouldReanneal = this.reannealCriteria();
+        if (shouldReanneal) {
+          // Do nothing for now.
+        }
+
+        if (numEvals >= this.args.evals) {
+          // DONE WITH OPTIMISING WRITE EVERYTHING TO DISK AND EXIT.
+          globals.time.generateCryptopt = (Date.now() - optimistaionStartDate) / 1000 - globals.time.validate;
+          clearInterval(intervalHandle);
+
+          Logger.log("writing current asm");
+          const elapsed = Date.now() - optimistaionStartDate;
+          const paddedSeed = padSeed(Paul.initialSeed);
+
+          const statistics = genStatistics({
+            paddedSeed,
+            ratioString,
+            evals: this.args.evals,
+            elapsed,
+            batchSize,
+            numBatches,
+            acc: accumulatedTimeSpentByMeasuring,
+            numRevert: this.numRevert,
+            numMut: this.numMut,
+            counter: this.measuresuite.timer,
+            framePointer: this.args.framePointer,
+            memoryConstraints: this.args.memoryConstraints,
+            cyclegoal: this.args.cyclegoal,
+          });
+          Logger.log(statistics);
+
+          const [asmFile, mutationsCsvFile] = generateResultFilename(
+            { ...this.args, symbolname: this.symbolname },
+            [`_ratio${ratioString.replace(".", "")}.asm`, `.csv`],
+          );
+
+          // write best found solution with headers
+
+          writeString(
+            asmFile,
+            ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
+              .concat(candidates[CURRENT_FUNCTION].asm)
+              .concat(statistics)
+              .join("\n"),
+          );
+
+          // writing the CSV
+          writeString(mutationsCsvFile, globals.mutationLog.join("\n"));
+
+          if (shouldProof(this.args)) {
+            // and proof correct
+            const proofCmd = FiatBridge.buildProofCommand(this.args.curve, this.args.method, asmFile);
+            Logger.log(`proofing that asm correct with '${proofCmd}'`);
+            try {
+              const now = Date.now();
+              execSync(proofCmd, { shell: "/usr/bin/bash" });
+              const timeForValidation = (Date.now() - now) / 1000;
+              appendFileSync(asmFile, `\n; validated in ${timeForValidation}s\n`);
+              globals.time.validate += timeForValidation;
+            } catch (e) {
+              console.error(`tried to prove correct. didnt work. I tried ${proofCmd}`);
+              errorOut(ERRORS.proofUnsuccessful);
+            }
+          }
+          Logger.log("done with that current price of assembly code.");
+          this.cleanLibcheckfunctions();
+          const v = this.measuresuite.destroy();
+          Logger.log(`Wonderful. Done with my work. Destroyed measuresuite (${v}). Time for lunch.`);
+
+          resolve(0);
         }
       }, 0);
     });
   }
 
-  // Metropolis-Hastings.
+  // Metropolis-Hastings Acceptance Criterion.
   private shouldAccept(currentEnergy: number, visitEnergy: number, temperature: number) {
     if (visitEnergy <= currentEnergy) {
       return true;
@@ -470,15 +465,15 @@ export class SAOptimizer implements Optimizer {
 
 type CoolingSchedule = (n: number) => number;
 
-function makeExpCoolingSchedule(visitParam: number, initialTemp: number): CoolingSchedule {
-  const a = visitParam - 1;
-  const t1 = Math.expm1(a * Math.log(2.0)); // 2^a - 1
-  return (t: number) => {
-    const s = t + 2.0;
-    const t2 = Math.expm1(a * Math.log(s)); // (t+2)^a - 1
-    return (initialTemp * t1) / t2;
-  };
-}
+// function makeExpCoolingSchedule(visitParam: number, initialTemp: number): CoolingSchedule {
+//   const a = visitParam - 1;
+//   const t1 = Math.expm1(a * Math.log(2.0)); // 2^a - 1
+//   return (step: number) => {
+//     const s = step + 2.0;
+//     const t2 = Math.expm1(a * Math.log(s)); // (step+2)^a - 1
+//     return (initialTemp * t1) / t2;
+//   };
+// }
 
 function makeLinCoolingSchedule(initialTemp: number): CoolingSchedule {
   return (step: number) => {
@@ -488,7 +483,7 @@ function makeLinCoolingSchedule(initialTemp: number): CoolingSchedule {
 
 function makeLogCoolingSchedule(initialTemp: number): CoolingSchedule {
   return (step: number) => {
-    const a = Math.log(step + 1);
+    const a = Math.log(step + Math.E);
     const b = initialTemp / a;
     return b;
   };
@@ -533,4 +528,31 @@ function makeBoltzmanVisitingDistribution(stepSizeParam: number): VisitingDistri
     n = Math.min(1, n); // Ensure at least one step.
     return n;
   };
+}
+
+type AcceptCriteria = (energyCurrent: number, energyVisit: number, temperature: number) => boolean;
+
+function makeBinaryAcceptanceCriteria(acceptParam: number): AcceptCriteria {
+  // Accept if not worse.
+  return (energyCurrent: number, energyVisit: number, temperature: number) => {
+    return energyVisit <= energyCurrent;
+  };
+}
+
+function makeMetropolisAcceptanceCriteria(acceptParam: number): AcceptCriteria {
+  return (energyCurrent: number, energyVisit: number, temperature: number) => {
+    if (energyVisit <= energyCurrent) {
+      return true;
+    }
+    const energyDelta = energyVisit - energyCurrent;
+    const pr = Math.min(1, Math.exp(energyDelta / temperature));
+    const u = Paul.uniform();
+    return u < pr;
+  };
+}
+
+type ReannealCriteria = () => boolean;
+
+function makeNoOpReannealCriteria(): ReannealCriteria {
+  return () => false;
 }

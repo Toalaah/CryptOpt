@@ -408,11 +408,9 @@ export class Model {
 
   private _restoreSnapshot(id: string) {
     const state = this.snapshots[id];
-    Logger.log(`restoring model snapshot: '${id}' (${state})`);
     if (state === undefined) throw new Error(`no such snapshot with id: '${id}'`);
     Model._nodes = state.nodes;
     Model._order = state.order;
-    this._currentReadOrderIsValid = false;
   }
 
   public static restoreSnapshot(id: string) {

@@ -153,6 +153,11 @@ export class Paul {
     return z * stdev + mean;
   }
 
+  public static sampleCauchy(loc: number, scale: number): number {
+    const u = Paul.uniform();
+    return loc + scale * Math.tan(Math.PI * (u - 0.5));
+  }
+
   /**
    * will splice (remove and return) one random element
    * from @param arr

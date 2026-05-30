@@ -1,4 +1,5 @@
 node_modules
+bench
 dist
 bins
 results*
@@ -12,4 +13,8 @@ demo
 src/bridge/fiat-bridge/data/sha256sums
 src/bridge/jasmin-bridge/data-libjade/
 .gdb_history
-
+.env
+.cryptopt
+.ipynb_checkpoints
+*.ipynb
+/*.csv

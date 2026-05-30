@@ -14,6 +14,22 @@
  * limitations under the License.
  */
 
-export * from "./rls/optimizer.class";
-export * from "./optimizerFactory";
-export * from "./optimizer.helper.class";
+import { OptimizerArgs } from "@/types";
+import { RLSOptimizer } from "@/optimizer/rls";
+
+export class OptimizerFactory {
+  public static make(args: OptimizerArgs): Optimizer {
+    switch (args.optimizer) {
+      case "rls":
+        return new RLSOptimizer(args);
+      case "sa":
+      default:
+        throw new Error(`unknown optimizer strategy: ${args.optimizer}`);
+    }
+  }
+}
+
+export abstract class Optimizer {
+  public abstract optimise(): Promise<number>;
+  public abstract getSymbolname(deleteCache?: boolean): string;
+}

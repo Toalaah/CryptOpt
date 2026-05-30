@@ -30,7 +30,7 @@ import {
 } from "@/bridge/fiat-bridge/constants";
 import { errorOut, ERRORS } from "@/errors";
 
-import { FRAME_POINTER_OPTIONS, MEMORY_CONSTRAINTS_OPTIONS, ParsedArgsT } from "../types";
+import { FRAME_POINTER_OPTIONS, MEMORY_CONSTRAINTS_OPTIONS, OPTIMIZERS, ParsedArgsT } from "../types";
 
 const y = await yargs(process.argv.slice(2));
 
@@ -50,6 +50,12 @@ export const parsedArgs = y
     default: "square",
     describe: "Method to optimise on.",
     choices: uniq(FIAT_METHODS.concat(BITCOIN_CORE_METHODS)),
+  })
+  .option("optimizer", {
+    string: true,
+    alias: "o",
+    default: "rls",
+    choices: OPTIMIZERS,
   })
   .option("bridge", {
     string: true,

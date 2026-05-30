@@ -26,6 +26,9 @@ import { parsedArgs } from "@/helper";
 
 import { Fiat } from "./fiat.namespace";
 
+export const OPTIMIZERS = ["rls", "sa"] as const;
+export type OPTIMIZER_T = (typeof OPTIMIZERS)[number];
+
 export const FRAME_POINTER_OPTIONS = ["omit", "save", "constant"] as const;
 export type FRAME_POINTER_OPTIONS_T = (typeof FRAME_POINTER_OPTIONS)[number];
 

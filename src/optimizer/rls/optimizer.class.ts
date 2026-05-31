@@ -72,7 +72,7 @@ export class RLSOptimizer implements Optimizer {
 
     globals.convergence = [];
     globals.mutationLog = [
-      "evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
+      "evaluation,choice,kept,stepSize,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
     ];
     // load a saved state if necessary
     if (args.readState) {

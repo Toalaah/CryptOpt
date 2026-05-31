@@ -122,15 +122,19 @@ export function logMutation({
   choice,
   kept,
   numEvals,
+  stepSize,
 }: {
   choice: CHOICE;
   numEvals: number;
   kept: boolean;
+  stepSize?: number;
 }): void {
   const pDetails = choice == " P" ? Model.permutationStats : "                      ";
   const dDetails = choice == "D " ? Model.decisionStats : "             ";
 
-  globals.mutationLog.push([numEvals, choice.trim(), kept ? 1 : 0, pDetails, dDetails].join(","));
+  globals.mutationLog.push(
+    [numEvals, choice.trim(), kept ? 1 : 0, stepSize ?? 1, pDetails, dDetails].join(","),
+  );
 }
 
 export function printStartInfo({

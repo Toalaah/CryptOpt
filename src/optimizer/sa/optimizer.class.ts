@@ -78,7 +78,7 @@ export class SAOptimizer implements Optimizer {
 
     globals.convergence = [];
     globals.mutationLog = [
-      "evaluation,choice,kept,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
+      "evaluation,choice,kept,stepSize,PdetailsBackForwardChosenstepsWaled,DdetailsKindNumhotNumall",
     ];
     // load a saved state if necessary
     if (args.readState) {
@@ -88,10 +88,6 @@ export class SAOptimizer implements Optimizer {
 
     // Set SA algorithm args
     this.initialTemperature = this.args.saInitialTemperature;
-
-    // TODO: change these hard-coded criteria
-    this.acceptCriteria = makeBinaryAcceptanceCriteria(this.args.saAcceptParam);
-    this.reannealCriteria = makeNoOpReannealCriteria();
 
     switch (this.args.saCoolingSchedule) {
       case "lin":
@@ -120,6 +116,11 @@ export class SAOptimizer implements Optimizer {
       default:
         throw new Error(`unknown visiting distribution: ${this.args.saVisitingDistribution}`);
     }
+
+    // TODO: change these hard-coded criteria
+    this.acceptCriteria = makeBinaryAcceptanceCriteria(this.args.saAcceptParam);
+    this.reannealCriteria = makeNoOpReannealCriteria();
+    this.visitingDistribution = makeConstVisitingDistribution(this.args.saStepSizeParam);
   }
 
   private no_of_instructions = -1;
@@ -159,6 +160,12 @@ export class SAOptimizer implements Optimizer {
     }
   }
 
+  private mutateMulti(stepSize: number): void {
+    for (let i = 0; i < stepSize; ++i) {
+      this.mutate();
+    }
+  }
+
   public optimise() {
     type Candidate = {
       asm: string;
@@ -194,9 +201,11 @@ export class SAOptimizer implements Optimizer {
       candidates[slot].length = filteredInstructions.length;
     };
 
-    const sampleNeighbor = (slot: number) => {
-      this.mutate();
+    const sampleNeighbor = (slot: number, temperature: number) => {
+      const stepSize = this.visitingDistribution(temperature);
+      this.mutateMulti(stepSize);
       assemble(slot);
+      return stepSize;
     };
 
     return new Promise<number>((resolve) => {
@@ -237,7 +246,7 @@ export class SAOptimizer implements Optimizer {
         // Always save current state before sampling.
         Model.saveSnaphot(CURRENT_FUNCTION.toString());
         // Current model state is now mutated variant.
-        sampleNeighbor(CANDIDATE_FUNCTION);
+        const stepSize = sampleNeighbor(CANDIDATE_FUNCTION, temperature);
 
         const now_measure = Date.now();
 
@@ -329,7 +338,7 @@ export class SAOptimizer implements Optimizer {
           per_second_counter = 0;
         }
 
-        logMutation({ choice, kept, numEvals });
+        logMutation({ choice, kept, numEvals, stepSize });
         if (numEvals % PRINT_EVERY == 0) {
           // print every 10th eval
           // a line every 5% (also to logfile) also write the asm when
@@ -439,17 +448,6 @@ export class SAOptimizer implements Optimizer {
     });
   }
 
-  // Metropolis-Hastings Acceptance Criterion.
-  private shouldAccept(currentEnergy: number, visitEnergy: number, temperature: number) {
-    if (visitEnergy <= currentEnergy) {
-      return true;
-    }
-    const energyDelta = visitEnergy - currentEnergy;
-    const pr = Math.min(1, Math.exp(energyDelta / temperature));
-    const u = Paul.uniform();
-    return u < pr;
-  }
-
   private cleanLibcheckfunctions() {
     if (existsSync(this.libcheckfunctionDirectory)) {
       try {
@@ -500,6 +498,10 @@ function makeGeoCoolingSchedule(initialTemp: number, alpha: number): CoolingSche
 
 type VisitingDistribution = (temperature: number) => number;
 
+function makeConstVisitingDistribution(_: number): VisitingDistribution {
+  return (_: number) => 1;
+}
+
 function makeGaussianVisitingDistribution(stepSizeParam: number): VisitingDistribution {
   return (temperature: number) => {
     let n = Paul.sampleGaussian(0, stepSizeParam); // Sample from normal distribution centered at 0 with scale controlled by step size.
@@ -533,9 +535,8 @@ function makeBoltzmanVisitingDistribution(stepSizeParam: number): VisitingDistri
 
 type AcceptCriteria = (energyCurrent: number, energyVisit: number, temperature: number) => boolean;
 
-function makeBinaryAcceptanceCriteria(acceptParam: number): AcceptCriteria {
-  // Accept if not worse.
-  return (energyCurrent: number, energyVisit: number, temperature: number) => {
+function makeBinaryAcceptanceCriteria(_: number): AcceptCriteria {
+  return (energyCurrent: number, energyVisit: number, _: number) => {
     return energyVisit <= energyCurrent;
   };
 }

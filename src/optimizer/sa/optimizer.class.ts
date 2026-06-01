@@ -173,6 +173,11 @@ export class SAOptimizer implements Optimizer {
       length: number;
     };
 
+    type SaveState = {
+      asm: string;
+      cycleCount: number;
+    };
+
     const CURRENT_FUNCTION = 0 as const;
     const CANDIDATE_FUNCTION = 1 as const;
     const candidates = new Array<Candidate>(2);
@@ -199,6 +204,21 @@ export class SAOptimizer implements Optimizer {
       candidates[slot].asm = asm;
       candidates[slot].stacklength = assembleResult.stacklength;
       candidates[slot].length = filteredInstructions.length;
+    };
+
+    // Initialize best state.
+    let bestState: SaveState = {
+      asm: "",
+      cycleCount: Infinity,
+    };
+
+    const updateBestState = (asm: string, cycleCount: number) => {
+      if (cycleCount <= bestState.cycleCount) {
+        bestState.asm = asm;
+        bestState.cycleCount = cycleCount;
+        return true;
+      }
+      return false;
     };
 
     const sampleNeighbor = (slot: number, temperature: number) => {
@@ -236,6 +256,8 @@ export class SAOptimizer implements Optimizer {
         if (asm === "" || stacklength === -1 || length === -1 || asm.includes("undefined"))
           errorOut({ msg: "ASM string empty/undefined, big yikes", exitCode: 1 });
         this.no_of_instructions = length;
+        // Best state is iniitally set to initial state.
+        bestState.asm = asm;
       }
 
       // Actual optimization loop starts here.
@@ -304,6 +326,7 @@ export class SAOptimizer implements Optimizer {
         batchSize = Math.min(batchSize, 10000);
         batchSize = Math.max(batchSize, 5);
         let kept: boolean;
+        let wasBest: boolean;
         const shouldAccept = this.acceptCriteria(meanrawCurrent, meanrawCandidate, temperature);
         if (shouldAccept) {
           // After mutation, model state is currently already the mutated variant. In that case, there is nothing to do except set the current solution's ASM to the candidate.
@@ -314,6 +337,7 @@ export class SAOptimizer implements Optimizer {
           candidates[CURRENT_FUNCTION].stacklength = candidates[CANDIDATE_FUNCTION].stacklength;
           candidates[CURRENT_FUNCTION].length = candidates[CANDIDATE_FUNCTION].length;
           this.no_of_instructions = candidates[CANDIDATE_FUNCTION].length;
+          wasBest = updateBestState(candidates[CURRENT_FUNCTION].asm, meanrawCandidate);
         } else {
           // revert
           kept = false;
@@ -404,9 +428,13 @@ export class SAOptimizer implements Optimizer {
           });
           Logger.log(statistics);
 
-          const [asmFile, mutationsCsvFile] = generateResultFilename(
+          const [asmFile, asmFileBest, mutationsCsvFile] = generateResultFilename(
             { ...this.args, symbolname: this.symbolname },
-            [`_ratio${ratioString.replace(".", "")}.asm`, `.csv`],
+            [
+              `_ratio${ratioString.replace(".", "")}.asm`,
+              `_ratio${ratioString.replace(".", "")}_best.asm`,
+              `.csv`,
+            ],
           );
 
           // write best found solution with headers
@@ -415,6 +443,14 @@ export class SAOptimizer implements Optimizer {
             asmFile,
             ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
               .concat(candidates[CURRENT_FUNCTION].asm)
+              .concat(statistics)
+              .join("\n"),
+          );
+
+          writeString(
+            asmFileBest,
+            ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
+              .concat(bestState.asm)
               .concat(statistics)
               .join("\n"),
           );

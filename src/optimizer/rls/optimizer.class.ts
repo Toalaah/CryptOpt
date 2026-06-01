@@ -62,7 +62,7 @@ export class RLSOptimizer implements Optimizer {
     Paul.seed = args.seed;
 
     const randomString = sha1Hash(Math.ceil(Date.now() * Math.random())).toString(36);
-    const cacheDir = args.cacheDir ?? tmpdir()
+    const cacheDir = args.cacheDir ?? tmpdir();
     this.libcheckfunctionDirectory = join(cacheDir, "CryptOpt.cache", randomString);
 
     const { measuresuite, symbolname } = init(this.libcheckfunctionDirectory, args);
@@ -134,6 +134,26 @@ export class RLSOptimizer implements Optimizer {
   }
 
   public optimise() {
+    type SaveState = {
+      asm: string;
+      cycleCount: number;
+    };
+
+    // Initialize best state.
+    let bestState: SaveState = {
+      asm: "",
+      cycleCount: Infinity,
+    };
+
+    const updateBestState = (asm: string, cycleCount: number) => {
+      if (cycleCount <= bestState.cycleCount) {
+        bestState.asm = asm;
+        bestState.cycleCount = cycleCount;
+        return true;
+      }
+      return false;
+    };
+
     return new Promise<number>((resolve) => {
       Logger.log("starting optimisation");
       printStartInfo({
@@ -177,6 +197,7 @@ export class RLSOptimizer implements Optimizer {
 
         // check if this was the first round
         if (numEvals == 0) {
+          bestState.asm = filteredInstructions.join("\n");
           // then point to fB and continue, write first
           if (this.asmStrings[FUNCTIONS.F_A].includes("undefined")) {
             const p = pathResolve(this.libcheckfunctionDirectory, "with_undefined.asm");
@@ -271,6 +292,10 @@ export class RLSOptimizer implements Optimizer {
           ) {
             Logger.log("kept    mutation");
             kept = true;
+            updateBestState(
+              this.asmStrings[currentNameOfTheFunctionThatHasTheMutation],
+              currentFunctionIsA() ? meanrawA : meanrawB,
+            );
             currentNameOfTheFunctionThatHasTheMutation = toggleFUNCTIONS(
               currentNameOfTheFunctionThatHasTheMutation,
             );
@@ -355,9 +380,13 @@ export class RLSOptimizer implements Optimizer {
             });
             Logger.log(statistics);
 
-            const [asmFile, mutationsCsvFile] = generateResultFilename(
+            const [asmFile, asmFileBest, mutationsCsvFile] = generateResultFilename(
               { ...this.args, symbolname: this.symbolname },
-              [`_ratio${ratioString.replace(".", "")}.asm`, `.csv`],
+              [
+                `_ratio${ratioString.replace(".", "")}.asm`,
+                `_ratio${ratioString.replace(".", "")}_best.asm`,
+                `.csv`,
+              ],
             );
 
             // write best found solution with headers
@@ -368,6 +397,14 @@ export class RLSOptimizer implements Optimizer {
               asmFile,
               ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
                 .concat(this.asmStrings[flipped])
+                .concat(statistics)
+                .join("\n"),
+            );
+
+            writeString(
+              asmFileBest,
+              ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
+                .concat(bestState.asm)
                 .concat(statistics)
                 .join("\n"),
             );

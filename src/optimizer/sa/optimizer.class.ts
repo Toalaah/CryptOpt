@@ -110,8 +110,10 @@ export class SAOptimizer implements Optimizer {
       case "cauchy":
         this.visitingDistribution = makeCauchyVisitingDistribution(this.args.saStepSizeParam);
         break;
-      case "boltzmann":
-        this.visitingDistribution = makeBoltzmanVisitingDistribution(this.args.saStepSizeParam);
+      case "uniform":
+        this.visitingDistribution = makeUniformVisitingDistribution(this.args.saStepSizeParam);
+      case "const":
+        this.visitingDistribution = makeConstVisitingDistribution(this.args.saStepSizeParam);
         break;
       default:
         throw new Error(`unknown visiting distribution: ${this.args.saVisitingDistribution}`);
@@ -133,7 +135,6 @@ export class SAOptimizer implements Optimizer {
 
     // TODO: change these hard-coded criteria
     this.reannealCriteria = makeNoOpReannealCriteria();
-    this.visitingDistribution = makeConstVisitingDistribution(this.args.saStepSizeParam);
   }
 
   private no_of_instructions = -1;
@@ -234,11 +235,9 @@ export class SAOptimizer implements Optimizer {
       return false;
     };
 
-    const sampleNeighbor = (slot: number, temperature: number) => {
-      const stepSize = this.visitingDistribution(temperature);
+    const sampleNeighbor = (slot: number, stepSize: number) => {
       this.mutateMulti(stepSize);
       assemble(slot);
-      return stepSize;
     };
 
     return new Promise<number>((resolve) => {
@@ -275,13 +274,17 @@ export class SAOptimizer implements Optimizer {
 
       // Actual optimization loop starts here.
       const intervalHandle = setInterval(() => {
+        Logger.log(`sa: new round ${numEvals}`);
         let temperature = this.coolingSchedule(temperatureIndex);
         if (Math.sign(temperature) < 0) errorOut({ exitCode: 123, msg: "negative temperature" });
 
         // Always save current state before sampling.
         Model.saveSnaphot(CURRENT_FUNCTION.toString());
         // Current model state is now mutated variant.
-        const stepSize = sampleNeighbor(CANDIDATE_FUNCTION, temperature);
+
+        const stepSize = this.visitingDistribution(temperature);
+        Logger.log(`sa: temperature ${temperature} step size ${stepSize}`);
+        sampleNeighbor(CANDIDATE_FUNCTION, stepSize);
 
         const now_measure = Date.now();
 
@@ -537,37 +540,35 @@ function makeGeoCoolingSchedule(initialTemp: number, alpha: number): CoolingSche
 
 type VisitingDistribution = (temperature: number) => number;
 
-function makeConstVisitingDistribution(_: number): VisitingDistribution {
-  return (_: number) => 1;
+function makeConstVisitingDistribution(stepSizeParam: number): VisitingDistribution {
+  return (_: number) => 1 + Math.round(stepSizeParam);
+}
+
+function makeUniformVisitingDistribution(stepSizeParam: number): VisitingDistribution {
+  return (temperature: number) => {
+    const lo = 1;
+    const hi = Math.max(1, Math.round(stepSizeParam * temperature));
+    // Paul.chooseBetween picks x from lo <= x < hi. Add 1 so we get uniform from [lo, hi].
+    return Paul.chooseBetween(lo, hi + 1);
+  };
 }
 
 function makeGaussianVisitingDistribution(stepSizeParam: number): VisitingDistribution {
   return (temperature: number) => {
-    let n = Paul.sampleGaussian(0, stepSizeParam); // Sample from normal distribution centered at 0 with scale controlled by step size.
+    let n = Paul.sampleGaussian(0, stepSizeParam * temperature); // Sample from normal distribution centered at 0 with scale controlled by step size.
     n = Math.abs(n); // Make positive.
     n = Math.round(n); // Round to nearest integer (we can only take discrete mutation step sizes).
-    n = Math.min(1, n); // Ensure at least one step.
+    n = 1 + n;
     return n;
   };
 }
 
 function makeCauchyVisitingDistribution(stepSizeParam: number): VisitingDistribution {
   return (temperature: number) => {
-    let n = Paul.sampleCauchy(0, stepSizeParam); // Sample from cauchy distribution centered at 0 with scale controlled by step size.
+    let n = Paul.sampleCauchy(0, stepSizeParam * temperature); // Sample from cauchy distribution centered at 0 with scale controlled by step size.
     n = Math.abs(n); // Make positive.
     n = Math.round(n); // Round to nearest integer (we can only take discrete mutation step sizes).
-    n = Math.min(1, n); // Ensure at least one step.
-    return n;
-  };
-}
-
-function makeBoltzmanVisitingDistribution(stepSizeParam: number): VisitingDistribution {
-  return (temperature: number) => {
-    const scale = stepSizeParam * Math.sqrt(Math.max(temperature, 1e-12)); // Dynamic scale dependent on temperature.
-    let n = Paul.sampleGaussian(0, scale); // Sample from normal distribution centered at 0 with scale controlled by step size.
-    n = Math.abs(n); // Make positive.
-    n = Math.round(n); // Round to nearest integer (we can only take discrete mutation step sizes).
-    n = Math.min(1, n); // Ensure at least one step.
+    n = 1 + n; // Ensure at least one step.
     return n;
   };
 }

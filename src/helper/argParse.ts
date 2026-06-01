@@ -70,26 +70,27 @@ export const parsedArgs = y
   // START SA optimizer params.
   .option("saInitialTemperature", {
     number: true,
-    default: 5000,
+    default: 1000,
     min: 0,
     describe: "Initial annealing temperature to use (has no effect if optimizer is not set to 'sa').",
   })
   .option("saStepSizeParam", {
     number: true,
-    default: 1,
-    min: 1 + Number.EPSILON,
+    default: 0.02,
+    min: Number.EPSILON,
     describe:
       "Controls the visit parameter tuning the scale of the visiting distribution (has no effect if optimizer is not set to 'sa').",
   })
   .option("saAcceptParam", {
     number: true,
-    default: 1.0,
+    default: 1,
     describe: "Acceptance parameter value (has no effect if optimizer is not set to 'sa').",
   })
   .option("saGeoCoolingRate", {
     number: true,
-    min: 0,
-    max: 1,
+    min: Number.EPSILON,
+    default: 0.9995,
+    max: 1 - Number.EPSILON,
     describe: "Cooling rate (alpha) to use when using geometric cooling schedule.",
   })
   .option("saVisitingDistribution", {

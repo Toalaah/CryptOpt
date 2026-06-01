@@ -21,6 +21,7 @@ import {
   FRAME_POINTER_OPTIONS_T,
   MEMORY_CONSTRAINTS_OPTIONS_T,
   OPTIMIZER_T,
+  SA_ACCEPT_CRITERIA_T,
   SA_COOLING_SCHEDULE_T,
   SA_VISITING_DISTRIBUTION_T,
 } from "@/types";
@@ -53,6 +54,7 @@ export type OptimizerArgs = {
   saAcceptParam: number;
   saCoolingSchedule: SA_COOLING_SCHEDULE_T;
   saVisitingDistribution: SA_VISITING_DISTRIBUTION_T;
+  saAcceptCriteria: SA_ACCEPT_CRITERIA_T;
   // END SA optimizer params.
 };
 export type ParsedArgsT = OptimizerArgs & {

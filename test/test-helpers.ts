@@ -46,6 +46,7 @@ export function getTestArgs(filename: string): OptimizerArgs {
     saAcceptParam: 0,
     saCoolingSchedule: "log",
     saVisitingDistribution: "gaussian",
+    saAcceptCriteria: "metropolis",
     evals: 1,
     seed: 11, //Date.now(),
     cyclegoal: 100,

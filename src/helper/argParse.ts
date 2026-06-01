@@ -36,6 +36,7 @@ import {
   MEMORY_CONSTRAINTS_OPTIONS,
   OPTIMIZERS,
   ParsedArgsT,
+  SA_ACCEPT_CRITERIA,
   SA_COOLING_SCHEDULES,
   SA_VISITING_DISTRIBUTIONS,
 } from "../types";
@@ -96,6 +97,12 @@ export const parsedArgs = y
     default: "gaussian",
     describe: "Visiting distribution to use (has no effect if optimizer is not set to 'sa').",
     choices: SA_VISITING_DISTRIBUTIONS,
+  })
+  .option("saAcceptCriteria", {
+    string: true,
+    default: "metropolis",
+    describe: "Acceptance criteria to use (has no effect if optimizer is not set to 'sa').",
+    choices: SA_ACCEPT_CRITERIA,
   })
   .option("saCoolingSchedule", {
     string: true,

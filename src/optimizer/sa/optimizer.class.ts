@@ -117,8 +117,21 @@ export class SAOptimizer implements Optimizer {
         throw new Error(`unknown visiting distribution: ${this.args.saVisitingDistribution}`);
     }
 
+    switch (this.args.saAcceptCriteria) {
+      case "binary":
+        this.acceptCriteria = makeBinaryAcceptanceCriteria(this.args.saAcceptParam);
+        break;
+      case "static":
+        this.acceptCriteria = makeStaticAcceptanceCriteria(this.args.saAcceptParam);
+        break;
+      case "metropolis":
+        this.acceptCriteria = makeMetropolisAcceptanceCriteria(this.args.saAcceptParam);
+        break;
+      default:
+        throw new Error(`unknown acceptance criteria : ${this.args.saAcceptCriteria}`);
+    }
+
     // TODO: change these hard-coded criteria
-    this.acceptCriteria = makeBinaryAcceptanceCriteria(this.args.saAcceptParam);
     this.reannealCriteria = makeNoOpReannealCriteria();
     this.visitingDistribution = makeConstVisitingDistribution(this.args.saStepSizeParam);
   }
@@ -500,16 +513,6 @@ export class SAOptimizer implements Optimizer {
 
 type CoolingSchedule = (n: number) => number;
 
-// function makeExpCoolingSchedule(visitParam: number, initialTemp: number): CoolingSchedule {
-//   const a = visitParam - 1;
-//   const t1 = Math.expm1(a * Math.log(2.0)); // 2^a - 1
-//   return (step: number) => {
-//     const s = step + 2.0;
-//     const t2 = Math.expm1(a * Math.log(s)); // (step+2)^a - 1
-//     return (initialTemp * t1) / t2;
-//   };
-// }
-
 function makeLinCoolingSchedule(initialTemp: number): CoolingSchedule {
   return (step: number) => {
     return initialTemp / (1 + step);
@@ -573,17 +576,33 @@ type AcceptCriteria = (energyCurrent: number, energyVisit: number, temperature: 
 
 function makeBinaryAcceptanceCriteria(_: number): AcceptCriteria {
   return (energyCurrent: number, energyVisit: number, _: number) => {
+    Logger.log(
+      `sa: current energy ${energyCurrent} visit energy ${energyVisit} ratio ${energyVisit / energyCurrent} diff ${energyVisit - energyCurrent}`,
+    );
     return energyVisit <= energyCurrent;
   };
 }
 
-function makeMetropolisAcceptanceCriteria(acceptParam: number): AcceptCriteria {
+function makeStaticAcceptanceCriteria(acceptParam: number): AcceptCriteria {
+  return (energyCurrent: number, energyVisit: number, _: number) => {
+    if (energyVisit <= energyCurrent) {
+      return true;
+    }
+    const u = Paul.uniform();
+    return u < acceptParam;
+  };
+}
+
+function makeMetropolisAcceptanceCriteria(_: number): AcceptCriteria {
   return (energyCurrent: number, energyVisit: number, temperature: number) => {
     if (energyVisit <= energyCurrent) {
       return true;
     }
     const energyDelta = energyVisit - energyCurrent;
-    const pr = Math.min(1, Math.exp(energyDelta / temperature));
+    const pr = Math.min(1, Math.exp(-energyDelta / temperature));
+    Logger.log(
+      `sa: current energy ${energyCurrent} visit energy ${energyVisit} ratio ${energyVisit / energyCurrent} diff ${energyDelta} accepting with prob ${pr}`,
+    );
     const u = Paul.uniform();
     return u < pr;
   };

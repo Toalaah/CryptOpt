@@ -112,6 +112,7 @@ export class SAOptimizer implements Optimizer {
         break;
       case "uniform":
         this.visitingDistribution = makeUniformVisitingDistribution(this.args.saStepSizeParam);
+        break;
       case "const":
         this.visitingDistribution = makeConstVisitingDistribution(this.args.saStepSizeParam);
         break;
@@ -594,12 +595,15 @@ function makeStaticAcceptanceCriteria(acceptParam: number): AcceptCriteria {
   };
 }
 
+// Adapted metropolis-hastings criteria, use the ratio of new/old cycles instead of the absolute difference. Should result in more consistent behavior across curves w/ different absolute cycle times.
 function makeMetropolisAcceptanceCriteria(_: number): AcceptCriteria {
   return (energyCurrent: number, energyVisit: number, temperature: number) => {
     if (energyVisit <= energyCurrent) {
       return true;
     }
-    const energyDelta = energyVisit - energyCurrent;
+
+    const ratio = energyVisit / energyCurrent;
+    const energyDelta = ratio * 1000; // ratios are generally small (up to ~1.2x), so we multiply here to get better granularity.
     const pr = Math.min(1, Math.exp(-energyDelta / temperature));
     Logger.log(
       `sa: current energy ${energyCurrent} visit energy ${energyVisit} ratio ${energyVisit / energyCurrent} diff ${energyDelta} accepting with prob ${pr}`,

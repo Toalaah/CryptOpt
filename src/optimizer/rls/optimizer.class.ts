@@ -137,18 +137,38 @@ export class RLSOptimizer implements Optimizer {
     type SaveState = {
       asm: string;
       cycleCount: number;
+      epoch: number;
+      ratio: number;
     };
 
-    // Initialize best state.
-    let bestState: SaveState = {
+    // Initialize best states.
+    let bestStateCycle: SaveState = {
       asm: "",
       cycleCount: Infinity,
+      epoch: 0,
+      ratio: 0,
     };
 
-    const updateBestState = (asm: string, cycleCount: number) => {
-      if (cycleCount <= bestState.cycleCount) {
-        bestState.asm = asm;
-        bestState.cycleCount = cycleCount;
+    let bestStateRatio: SaveState = {
+      asm: "",
+      cycleCount: Infinity,
+      epoch: 0,
+      ratio: 0,
+    };
+
+    const updateBestState = (asm: string, cycleCount: number, epoch: number, ratio: number) => {
+      if (cycleCount <= bestStateCycle.cycleCount) {
+        bestStateCycle.asm = asm;
+        bestStateCycle.cycleCount = cycleCount;
+        bestStateCycle.epoch = epoch;
+        bestStateCycle.ratio = ratio;
+        return true;
+      }
+      if (ratio >= bestStateRatio.ratio) {
+        bestStateRatio.asm = asm;
+        bestStateRatio.cycleCount = cycleCount;
+        bestStateRatio.epoch = epoch;
+        bestStateRatio.ratio = ratio;
         return true;
       }
       return false;
@@ -197,7 +217,8 @@ export class RLSOptimizer implements Optimizer {
 
         // check if this was the first round
         if (numEvals == 0) {
-          bestState.asm = filteredInstructions.join("\n");
+          bestStateCycle.asm = filteredInstructions.join("\n");
+          bestStateRatio.asm = filteredInstructions.join("\n");
           // then point to fB and continue, write first
           if (this.asmStrings[FUNCTIONS.F_A].includes("undefined")) {
             const p = pathResolve(this.libcheckfunctionDirectory, "with_undefined.asm");
@@ -295,6 +316,8 @@ export class RLSOptimizer implements Optimizer {
             updateBestState(
               this.asmStrings[currentNameOfTheFunctionThatHasTheMutation],
               currentFunctionIsA() ? meanrawA : meanrawB,
+              numEvals,
+              meanrawCheck / (currentFunctionIsA() ? meanrawA : meanrawB),
             );
             currentNameOfTheFunctionThatHasTheMutation = toggleFUNCTIONS(
               currentNameOfTheFunctionThatHasTheMutation,
@@ -380,11 +403,12 @@ export class RLSOptimizer implements Optimizer {
             });
             Logger.log(statistics);
 
-            const [asmFile, asmFileBest, mutationsCsvFile] = generateResultFilename(
+            const [asmFile, asmFileBestCycle, asmFileBestRatio, mutationsCsvFile] = generateResultFilename(
               { ...this.args, symbolname: this.symbolname },
               [
                 `_ratio${ratioString.replace(".", "")}.asm`,
-                `_ratio${ratioString.replace(".", "")}_best.asm`,
+                `_ratio${bestStateCycle.ratio.toFixed(4).replace(".", "")}_epoch${bestStateCycle.epoch}_best-cycle.asm`,
+                `_ratio${bestStateRatio.ratio.toFixed(4).replace(".", "")}_epoch${bestStateRatio.epoch}_best-ratio.asm`,
                 `.csv`,
               ],
             );
@@ -402,9 +426,17 @@ export class RLSOptimizer implements Optimizer {
             );
 
             writeString(
-              asmFileBest,
+              asmFileBestCycle,
               ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
-                .concat(bestState.asm)
+                .concat(bestStateCycle.asm)
+                .concat(statistics)
+                .join("\n"),
+            );
+
+            writeString(
+              asmFileBestRatio,
+              ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
+                .concat(bestStateRatio.asm)
                 .concat(statistics)
                 .join("\n"),
             );

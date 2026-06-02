@@ -91,10 +91,10 @@ export class SAOptimizer implements Optimizer {
 
     switch (this.args.saCoolingSchedule) {
       case "lin":
-        this.coolingSchedule = makeLinCoolingSchedule(this.initialTemperature);
+        this.coolingSchedule = makeLinCoolingSchedule(this.initialTemperature, this.args.saCoolingParam);
         break;
       case "log":
-        this.coolingSchedule = makeLogCoolingSchedule(this.initialTemperature);
+        this.coolingSchedule = makeLogCoolingSchedule(this.initialTemperature, this.args.saCoolingParam);
         break;
       case "geo":
         this.coolingSchedule = makeGeoCoolingSchedule(this.initialTemperature, this.args.saGeoCoolingRate);
@@ -191,6 +191,8 @@ export class SAOptimizer implements Optimizer {
     type SaveState = {
       asm: string;
       cycleCount: number;
+      epoch: number;
+      ratio: number;
     };
 
     const CURRENT_FUNCTION = 0 as const;
@@ -221,16 +223,34 @@ export class SAOptimizer implements Optimizer {
       candidates[slot].length = filteredInstructions.length;
     };
 
-    // Initialize best state.
-    let bestState: SaveState = {
+    // Initialize best states.
+    let bestStateCycle: SaveState = {
       asm: "",
       cycleCount: Infinity,
+      epoch: 0,
+      ratio: 1,
     };
 
-    const updateBestState = (asm: string, cycleCount: number) => {
-      if (cycleCount <= bestState.cycleCount) {
-        bestState.asm = asm;
-        bestState.cycleCount = cycleCount;
+    let bestStateRatio: SaveState = {
+      asm: "",
+      cycleCount: Infinity,
+      epoch: 0,
+      ratio: 0,
+    };
+
+    const updateBestState = (asm: string, cycleCount: number, epoch: number, ratio: number) => {
+      if (cycleCount <= bestStateCycle.cycleCount) {
+        bestStateCycle.asm = asm;
+        bestStateCycle.cycleCount = cycleCount;
+        bestStateCycle.epoch = epoch;
+        bestStateCycle.ratio = ratio;
+        return true;
+      }
+      if (ratio >= bestStateRatio.ratio) {
+        bestStateRatio.asm = asm;
+        bestStateRatio.cycleCount = cycleCount;
+        bestStateRatio.epoch = epoch;
+        bestStateRatio.ratio = ratio;
         return true;
       }
       return false;
@@ -269,8 +289,9 @@ export class SAOptimizer implements Optimizer {
         if (asm === "" || stacklength === -1 || length === -1 || asm.includes("undefined"))
           errorOut({ msg: "ASM string empty/undefined, big yikes", exitCode: 1 });
         this.no_of_instructions = length;
-        // Best state is iniitally set to initial state.
-        bestState.asm = asm;
+        // Best state is initally set to initial state.
+        bestStateCycle.asm = asm;
+        bestStateRatio.asm = asm;
       }
 
       // Actual optimization loop starts here.
@@ -354,7 +375,12 @@ export class SAOptimizer implements Optimizer {
           candidates[CURRENT_FUNCTION].stacklength = candidates[CANDIDATE_FUNCTION].stacklength;
           candidates[CURRENT_FUNCTION].length = candidates[CANDIDATE_FUNCTION].length;
           this.no_of_instructions = candidates[CANDIDATE_FUNCTION].length;
-          wasBest = updateBestState(candidates[CURRENT_FUNCTION].asm, meanrawCandidate);
+          wasBest = updateBestState(
+            candidates[CURRENT_FUNCTION].asm,
+            meanrawCandidate,
+            numEvals,
+            meanrawCheck / meanrawCandidate,
+          );
         } else {
           // revert
           kept = false;
@@ -445,16 +471,17 @@ export class SAOptimizer implements Optimizer {
           });
           Logger.log(statistics);
 
-          const [asmFile, asmFileBest, mutationsCsvFile] = generateResultFilename(
+          const [asmFile, asmFileBestCycle, asmFileBestRatio, mutationsCsvFile] = generateResultFilename(
             { ...this.args, symbolname: this.symbolname },
             [
               `_ratio${ratioString.replace(".", "")}.asm`,
-              `_ratio${ratioString.replace(".", "")}_best.asm`,
+              `_ratio${bestStateCycle.ratio.toFixed(4).replace(".", "")}_epoch${bestStateCycle.epoch}_best-cycle.asm`,
+              `_ratio${bestStateRatio.ratio.toFixed(4).replace(".", "")}_epoch${bestStateRatio.epoch}_best-ratio.asm`,
               `.csv`,
             ],
           );
 
-          // write best found solution with headers
+          // write best found solutions with headers
 
           writeString(
             asmFile,
@@ -465,9 +492,17 @@ export class SAOptimizer implements Optimizer {
           );
 
           writeString(
-            asmFileBest,
+            asmFileBestCycle,
             ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
-              .concat(bestState.asm)
+              .concat(bestStateCycle.asm)
+              .concat(statistics)
+              .join("\n"),
+          );
+
+          writeString(
+            asmFileBestRatio,
+            ["SECTION .text", `\tGLOBAL ${this.symbolname}`, `${this.symbolname}:`]
+              .concat(bestStateRatio.asm)
               .concat(statistics)
               .join("\n"),
           );

@@ -97,7 +97,11 @@ export class SAOptimizer implements Optimizer {
         this.coolingSchedule = makeLogCoolingSchedule(this.initialTemperature, this.args.saCoolingParam);
         break;
       case "geo":
-        this.coolingSchedule = makeGeoCoolingSchedule(this.initialTemperature, this.args.saGeoCoolingRate);
+        this.coolingSchedule = makeGeoCoolingSchedule(
+          this.initialTemperature,
+          this.args.saCoolingParam,
+          this.args.saGeoCoolingRate,
+        );
         break;
       default:
         throw new Error(`unknown cooling schedule: ${this.args.saCoolingSchedule}`);
@@ -134,8 +138,13 @@ export class SAOptimizer implements Optimizer {
         throw new Error(`unknown acceptance criteria : ${this.args.saAcceptCriteria}`);
     }
 
-    // TODO: change these hard-coded criteria
-    this.reannealCriteria = makeNoOpReannealCriteria();
+    switch (this.args.saReannealStrategy) {
+      case "none":
+        this.reannealCriteria = makeNoOpReannealCriteria();
+        break;
+      default:
+        throw new Error(`unknown reanneal strategy : ${this.args.saReannealStrategy}`);
+    }
   }
 
   private no_of_instructions = -1;
@@ -552,24 +561,27 @@ export class SAOptimizer implements Optimizer {
 
 type CoolingSchedule = (n: number) => number;
 
-function makeLinCoolingSchedule(initialTemp: number): CoolingSchedule {
+function makeLinCoolingSchedule(initialTemp: number, coolingParam: number): CoolingSchedule {
   return (step: number) => {
-    return initialTemp / (1 + step);
+    const scaledStep = step / coolingParam;
+    return initialTemp / (1 + scaledStep);
   };
 }
 
-function makeLogCoolingSchedule(initialTemp: number): CoolingSchedule {
+function makeLogCoolingSchedule(initialTemp: number, coolingParam: number): CoolingSchedule {
   return (step: number) => {
-    const a = Math.log(step + Math.E);
+    const scaledStep = step / coolingParam;
+    const a = Math.log(scaledStep + Math.E);
     const b = initialTemp / a;
     return b;
   };
 }
 
-function makeGeoCoolingSchedule(initialTemp: number, alpha: number): CoolingSchedule {
+function makeGeoCoolingSchedule(initialTemp: number, coolingParam: number, alpha: number): CoolingSchedule {
   if (!(alpha > 0 && alpha < 1)) throw new Error("invalid alpha");
   return (step: number) => {
-    const a = Math.pow(alpha, step);
+    const scaledStep = step / coolingParam;
+    const a = Math.pow(alpha, scaledStep);
     return initialTemp * a;
   };
 }
@@ -630,21 +642,19 @@ function makeStaticAcceptanceCriteria(acceptParam: number): AcceptCriteria {
   };
 }
 
-// Adapted metropolis-hastings criteria, use the ratio of new/old cycles instead of the absolute difference. Should result in more consistent behavior across curves w/ different absolute cycle times.
-function makeMetropolisAcceptanceCriteria(_: number): AcceptCriteria {
+// Metropolis-hastings criteria.
+function makeMetropolisAcceptanceCriteria(acceptParam: number): AcceptCriteria {
   return (energyCurrent: number, energyVisit: number, temperature: number) => {
     if (energyVisit <= energyCurrent) {
       return true;
     }
-
-    const ratio = energyVisit / energyCurrent;
-    const energyDelta = ratio * 1000; // ratios are generally small (up to ~1.2x), so we multiply here to get better granularity.
+    const energyDelta = (energyVisit - energyCurrent) / acceptParam;
     const pr = Math.min(1, Math.exp(-energyDelta / temperature));
     Logger.log(
       `sa: current energy ${energyCurrent} visit energy ${energyVisit} ratio ${energyVisit / energyCurrent} diff ${energyDelta} accepting with prob ${pr}`,
     );
     const u = Paul.uniform();
-    return u < pr;
+    return u <= pr;
   };
 }
 

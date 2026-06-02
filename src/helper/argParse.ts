@@ -16,7 +16,6 @@
 
 import { uniq } from "lodash-es";
 import yargs from "yargs";
-import { tmpdir } from "node:os";
 
 import {
   AVAILABLE_METHODS as BITCOIN_CORE_METHODS,
@@ -38,6 +37,7 @@ import {
   ParsedArgsT,
   SA_ACCEPT_CRITERIA,
   SA_COOLING_SCHEDULES,
+  SA_REANNEAL_STRATEGIES,
   SA_VISITING_DISTRIBUTIONS,
 } from "../types";
 
@@ -76,7 +76,7 @@ export const parsedArgs = y
   })
   .option("saStepSizeParam", {
     number: true,
-    default: 0.02,
+    default: 0.005,
     min: Number.EPSILON,
     describe:
       "Controls the visit parameter tuning the scale of the visiting distribution (has no effect if optimizer is not set to 'sa').",
@@ -92,6 +92,13 @@ export const parsedArgs = y
     default: 0.995,
     max: 1 - Number.EPSILON,
     describe: "Cooling rate (alpha) to use when using geometric cooling schedule.",
+  })
+  .option("saCoolingParam", {
+    number: true,
+    default: 1,
+    min: Number.EPSILON,
+    describe:
+      "Stretches out cooling rate. Higher values decrease the rate of cooling by the specified factor.",
   })
   .option("saVisitingDistribution", {
     string: true,
@@ -110,6 +117,12 @@ export const parsedArgs = y
     default: "log",
     describe: "Cooling schedule to use (has no effect if optimizer is not set to 'sa').",
     choices: SA_COOLING_SCHEDULES,
+  })
+  .option("saReannealStrategy", {
+    string: true,
+    default: "none",
+    describe: "Reannealing strategy to use (has no effect if optimizer is not set to 'sa').",
+    choices: SA_REANNEAL_STRATEGIES,
   })
   // END SA optimizer params.
   .option("bridge", {

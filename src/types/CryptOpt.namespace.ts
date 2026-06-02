@@ -38,6 +38,9 @@ export type SA_VISITING_DISTRIBUTION_T = (typeof SA_VISITING_DISTRIBUTIONS)[numb
 export const SA_ACCEPT_CRITERIA = ["binary", "static", "metropolis"] as const;
 export type SA_ACCEPT_CRITERIA_T = (typeof SA_ACCEPT_CRITERIA)[number];
 
+export const SA_REANNEAL_STRATEGIES = ["none"] as const;
+export type SA_REANNEAL_STRATEGY_T = (typeof SA_REANNEAL_STRATEGIES)[number];
+
 export const FRAME_POINTER_OPTIONS = ["omit", "save", "constant"] as const;
 export type FRAME_POINTER_OPTIONS_T = (typeof FRAME_POINTER_OPTIONS)[number];
 

@@ -23,6 +23,7 @@ import {
   OPTIMIZER_T,
   SA_ACCEPT_CRITERIA_T,
   SA_COOLING_SCHEDULE_T,
+  SA_REANNEAL_STRATEGY_T,
   SA_VISITING_DISTRIBUTION_T,
 } from "@/types";
 
@@ -52,9 +53,11 @@ export type OptimizerArgs = {
   saStepSizeParam: number;
   saGeoCoolingRate: number;
   saAcceptParam: number;
+  saCoolingParam: number;
   saCoolingSchedule: SA_COOLING_SCHEDULE_T;
   saVisitingDistribution: SA_VISITING_DISTRIBUTION_T;
   saAcceptCriteria: SA_ACCEPT_CRITERIA_T;
+  saReannealStrategy: SA_REANNEAL_STRATEGY_T;
   // END SA optimizer params.
 };
 export type ParsedArgsT = OptimizerArgs & {

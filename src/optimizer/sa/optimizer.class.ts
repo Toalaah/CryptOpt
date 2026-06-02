@@ -93,6 +93,9 @@ export class SAOptimizer implements Optimizer {
       case "lin":
         this.coolingSchedule = makeLinCoolingSchedule(this.initialTemperature, this.args.saCoolingParam);
         break;
+      case "exp":
+        this.coolingSchedule = makeExpCoolingSchedule(this.initialTemperature, this.args.saCoolingParam);
+        break;
       case "log":
         this.coolingSchedule = makeLogCoolingSchedule(this.initialTemperature, this.args.saCoolingParam);
         break;
@@ -568,6 +571,17 @@ export class SAOptimizer implements Optimizer {
 }
 
 type CoolingSchedule = (n: number) => number;
+
+function makeExpCoolingSchedule(initialTemp: number, _: number): CoolingSchedule {
+  const visitParam = 1.8;
+  const a = visitParam - 1;
+  const t1 = Math.expm1(a * Math.log(2.0)); // 2^a - 1
+  return (t: number) => {
+    const s = t + 2.0;
+    const t2 = Math.expm1(a * Math.log(s)); // (t+2)^a - 1
+    return (initialTemp * t1) / t2;
+  };
+}
 
 function makeLinCoolingSchedule(initialTemp: number, coolingParam: number): CoolingSchedule {
   return (step: number) => {

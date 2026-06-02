@@ -29,7 +29,7 @@ import { Fiat } from "./fiat.namespace";
 export const OPTIMIZERS = ["rls", "sa"] as const;
 export type OPTIMIZER_T = (typeof OPTIMIZERS)[number];
 
-export const SA_COOLING_SCHEDULES = ["log", "lin", "geo"] as const;
+export const SA_COOLING_SCHEDULES = ["log", "lin", "geo", "exp"] as const;
 export type SA_COOLING_SCHEDULE_T = (typeof SA_COOLING_SCHEDULES)[number];
 
 export const SA_VISITING_DISTRIBUTIONS = ["gaussian", "uniform", "cauchy", "const"] as const;

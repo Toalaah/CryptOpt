@@ -160,7 +160,7 @@ export class SAOptimizer implements Optimizer {
 
   /** you usually don't want to mess with @param random.
    * mutate should not be called from outside with @param random=false*/
-  private mutate(random = true): void {
+  private mutate(random = true): CHOICE {
     if (random) {
       choice = Paul.pick([CHOICE.PERMUTE, CHOICE.DECISION]);
     }
@@ -177,17 +177,22 @@ export class SAOptimizer implements Optimizer {
           // this is the case, if there is no hot decisions.
           choice = CHOICE.PERMUTE;
           this.mutate(false);
-          return;
+          return choice;
         }
         this.numMut.decision++;
       }
     }
+
+    return choice;
   }
 
-  private mutateMulti(stepSize: number): void {
+  private mutateMulti(stepSize: number) {
+    let allMuts = { [CHOICE.DECISION]: 0, [CHOICE.PERMUTE]: 0 };
     for (let i = 0; i < stepSize; ++i) {
-      this.mutate();
+      const choice = this.mutate();
+      allMuts[choice]++;
     }
+    return allMuts;
   }
 
   public optimise() {
@@ -266,8 +271,9 @@ export class SAOptimizer implements Optimizer {
     };
 
     const sampleNeighbor = (slot: number, stepSize: number) => {
-      this.mutateMulti(stepSize);
+      const nMuts = this.mutateMulti(stepSize);
       assemble(slot);
+      return nMuts;
     };
 
     return new Promise<number>((resolve) => {
@@ -315,7 +321,7 @@ export class SAOptimizer implements Optimizer {
 
         const stepSize = this.visitingDistribution(temperature);
         Logger.log(`sa: temperature ${temperature} step size ${stepSize}`);
-        sampleNeighbor(CANDIDATE_FUNCTION, stepSize);
+        const nMuts = sampleNeighbor(CANDIDATE_FUNCTION, stepSize);
 
         const now_measure = Date.now();
 
@@ -395,6 +401,8 @@ export class SAOptimizer implements Optimizer {
           kept = false;
           // Pop back to previous model state.
           Model.restoreSnapshot(CURRENT_FUNCTION.toString());
+          this.numRevert.permutation += nMuts[CHOICE.PERMUTE];
+          this.numRevert.decision += nMuts[CHOICE.DECISION];
         }
         const indexGood = kept ? CANDIDATE_FUNCTION : CURRENT_FUNCTION;
         const indexBad = kept ? CURRENT_FUNCTION : CANDIDATE_FUNCTION;

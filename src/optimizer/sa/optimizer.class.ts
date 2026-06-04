@@ -91,10 +91,14 @@ export class SAOptimizer implements Optimizer {
 
     switch (this.args.saCoolingSchedule) {
       case "lin":
-        this.coolingSchedule = makeLinCoolingSchedule(this.initialTemperature, this.args.saCoolingParam);
+        this.coolingSchedule = makeLinCoolingSchedule(
+          this.initialTemperature,
+          this.args.saCoolingParam,
+          this.args.evals,
+        );
         break;
-      case "exp":
-        this.coolingSchedule = makeExpCoolingSchedule(this.initialTemperature, this.args.saCoolingParam);
+      case "fsa":
+        this.coolingSchedule = makeFsaCoolingSchedule(this.initialTemperature, this.args.saCoolingParam);
         break;
       case "log":
         this.coolingSchedule = makeLogCoolingSchedule(this.initialTemperature, this.args.saCoolingParam);
@@ -572,7 +576,7 @@ export class SAOptimizer implements Optimizer {
 
 type CoolingSchedule = (n: number) => number;
 
-function makeExpCoolingSchedule(initialTemp: number, _: number): CoolingSchedule {
+function makeFsaCoolingSchedule(initialTemp: number, _: number): CoolingSchedule {
   const visitParam = 1.4;
   const a = visitParam - 1;
   const t1 = Math.expm1(a * Math.log(2.0)); // 2^a - 1
@@ -583,10 +587,12 @@ function makeExpCoolingSchedule(initialTemp: number, _: number): CoolingSchedule
   };
 }
 
-function makeLinCoolingSchedule(initialTemp: number, _: number): CoolingSchedule {
+function makeLinCoolingSchedule(initialTemp: number, _: number, nEvals: number): CoolingSchedule {
   return (step: number) => {
-    const scaledStep = step * 0.005;
-    return initialTemp / (1 + scaledStep);
+    const scaledStep = step * 1;
+    const temp = initialTemp * ((nEvals - scaledStep) / nEvals);
+    // Should technically not be needed so long as nEvals param is legit, but a little redundancy never hurts.
+    return Math.max(temp, 0);
   };
 }
 
@@ -599,10 +605,10 @@ function makeLogCoolingSchedule(initialTemp: number, _: number): CoolingSchedule
   };
 }
 
-function makeGeoCoolingSchedule(initialTemp: number, coolingParam: number, alpha: number): CoolingSchedule {
+function makeGeoCoolingSchedule(initialTemp: number, _: number, alpha: number): CoolingSchedule {
   if (!(alpha > 0 && alpha < 1)) throw new Error("invalid alpha");
   return (step: number) => {
-    const scaledStep = step / coolingParam;
+    const scaledStep = step * 1;
     const a = Math.pow(alpha, scaledStep);
     return initialTemp * a;
   };

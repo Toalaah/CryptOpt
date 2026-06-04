@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import csv
+from statistics import mean
 import argparse
 import os
 from pathlib import Path
@@ -25,6 +26,9 @@ class Run:
     visiting_distribution: int = 0
     accept_criteria: int = 0
     reanneal_strategy: int = 0
+    best_state_epoch: int = 0
+    step_size_avg: float = 0.0
+    step_size_max: int = 0
 
     def __repr__(self):
         return str(self.dir)
@@ -39,6 +43,7 @@ class Run:
             self.curve = d["curve"]
             self.method = d["method"]
             self.evals = d["evals"]
+            self.best_state_epoch = self.evals
             self.seed = d["seed"]
             self.optimizer = d["optimizer"]
             self.coolinig_schedule = d["saCoolingSchedule"]
@@ -46,6 +51,14 @@ class Run:
             self.visiting_distribution = d["saVisitingDistribution"]
             self.accept_criteria = d["saAcceptCriteria"]
             self.reanneal_strategy = d["saReannealStrategy"]
+        csv_files = list(self.dir.rglob("*.csv"))
+        assert len(csv_files) == 1
+        mutation_log = csv_files[0]
+        with open(mutation_log, "r") as f:
+            csv_reader = csv.DictReader(f)
+            step_sizes = [int(row["stepSize"]) for row in csv_reader]
+            self.step_size_avg = mean(step_sizes)
+            self.step_size_max = max(step_sizes)
 
 
 def measure_run(run: Run):
@@ -59,6 +72,10 @@ def measure_run(run: Run):
             trials.append(cycles_cryptopt)
         cycles_cryptopt_mean = mean(trials)
         if cycle_opt < 0.0 or cycles_cryptopt_mean < cycle_opt:
+            if "epoch" in asm_file.as_posix():
+                parts = asm_file.as_posix().split("ratio")[1].split("_")
+                assert len(parts) == 3 and parts[1].startswith("epoch")
+                run.best_state_epoch = int(parts[1].removeprefix("epoch"))
             cycle_opt = cycles_cryptopt_mean
     return int(cycle_opt), int(mean(cycles_lib_trials))
 
@@ -121,6 +138,9 @@ if __name__ == "__main__":
                 "saReannealStrategy",
                 "saVisitingDistribution",
                 "saAcceptCriteria",
+                "bestStateEpoch",
+                "stepSizeAvg",
+                "stepSizeMax",
                 "cyclesOpt",
                 "cyclesLib",
                 "speedup",
@@ -142,6 +162,9 @@ if __name__ == "__main__":
                     run.reanneal_strategy,
                     run.visiting_distribution,
                     run.accept_criteria,
+                    run.best_state_epoch,
+                    run.step_size_avg,
+                    run.step_size_max,
                     cycles_opt,
                     cycles_lib,
                     speedup,

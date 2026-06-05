@@ -35,7 +35,7 @@ export type SA_COOLING_SCHEDULE_T = (typeof SA_COOLING_SCHEDULES)[number];
 export const SA_VISITING_DISTRIBUTIONS = ["gaussian", "uniform", "cauchy", "const"] as const;
 export type SA_VISITING_DISTRIBUTION_T = (typeof SA_VISITING_DISTRIBUTIONS)[number];
 
-export const SA_ACCEPT_CRITERIA = ["binary", "static", "metropolis"] as const;
+export const SA_ACCEPT_CRITERIA = ["binary", "const-1", "const-5", "const-10", "rand", "metropolis"] as const;
 export type SA_ACCEPT_CRITERIA_T = (typeof SA_ACCEPT_CRITERIA)[number];
 
 export const SA_REANNEAL_STRATEGIES = ["none"] as const;

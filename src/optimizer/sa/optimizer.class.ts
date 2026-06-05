@@ -135,11 +135,20 @@ export class SAOptimizer implements Optimizer {
       case "binary":
         this.acceptCriteria = makeBinaryAcceptanceCriteria(this.args.saAcceptParam);
         break;
-      case "static":
-        this.acceptCriteria = makeStaticAcceptanceCriteria(this.args.saAcceptParam);
-        break;
       case "metropolis":
         this.acceptCriteria = makeMetropolisAcceptanceCriteria(this.args.saAcceptParam);
+        break;
+      case "const-1":
+        this.acceptCriteria = makeStaticAcceptanceCriteria(0.01);
+        break;
+      case "const-5":
+        this.acceptCriteria = makeStaticAcceptanceCriteria(0.05);
+        break;
+      case "const-10":
+        this.acceptCriteria = makeStaticAcceptanceCriteria(0.1);
+        break;
+      case "rand":
+        this.acceptCriteria = makeRandAcceptanceCriteria(this.args.saAcceptParam);
         break;
       default:
         throw new Error(`unknown acceptance criteria : ${this.args.saAcceptCriteria}`);
@@ -666,21 +675,25 @@ function makeStaticAcceptanceCriteria(acceptParam: number): AcceptCriteria {
       return true;
     }
     const u = Paul.uniform();
-    return u < acceptParam;
+    return u <= acceptParam;
+  };
+}
+
+function makeRandAcceptanceCriteria(_: number): AcceptCriteria {
+  return (_energyCurrent: number, _energyVisit: number, _: number) => {
+    const u = Paul.uniform();
+    return u <= 0.5;
   };
 }
 
 // Metropolis-hastings criteria.
-function makeMetropolisAcceptanceCriteria(acceptParam: number): AcceptCriteria {
+function makeMetropolisAcceptanceCriteria(_: number): AcceptCriteria {
   return (energyCurrent: number, energyVisit: number, temperature: number) => {
     if (energyVisit <= energyCurrent) {
       return true;
     }
-    const energyDelta = (energyVisit - energyCurrent) / acceptParam;
+    const energyDelta = energyVisit - energyCurrent;
     const pr = Math.min(1, Math.exp(-energyDelta / temperature));
-    Logger.log(
-      `sa: current energy ${energyCurrent} visit energy ${energyVisit} ratio ${energyVisit / energyCurrent} diff ${energyDelta} accepting with prob ${pr}`,
-    );
     const u = Paul.uniform();
     return u <= pr;
   };

@@ -122,10 +122,13 @@ export class SAOptimizer implements Optimizer {
         this.visitingDistribution = makeCauchyVisitingDistribution(this.args.saStepSizeParam);
         break;
       case "uniform":
-        this.visitingDistribution = makeUniformVisitingDistribution(this.args.saStepSizeParam);
+        this.visitingDistribution = makeUniformVisitingDistribution(0.05);
         break;
-      case "const":
-        this.visitingDistribution = makeConstVisitingDistribution(this.args.saStepSizeParam);
+      case "const-1":
+        this.visitingDistribution = makeConstVisitingDistribution(1);
+        break;
+      case "const-2":
+        this.visitingDistribution = makeConstVisitingDistribution(2);
         break;
       default:
         throw new Error(`unknown visiting distribution: ${this.args.saVisitingDistribution}`);
@@ -626,7 +629,7 @@ function makeGeoCoolingSchedule(initialTemp: number, _: number, alpha: number): 
 type VisitingDistribution = (temperature: number) => number;
 
 function makeConstVisitingDistribution(stepSizeParam: number): VisitingDistribution {
-  return (_: number) => 1 + Math.round(stepSizeParam);
+  return (_: number) => Math.round(stepSizeParam);
 }
 
 function makeUniformVisitingDistribution(stepSizeParam: number): VisitingDistribution {

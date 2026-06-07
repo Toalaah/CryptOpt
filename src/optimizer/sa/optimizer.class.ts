@@ -55,7 +55,6 @@ export class SAOptimizer implements Optimizer {
   private acceptCriteria: AcceptCriteria;
   private coolingSchedule: CoolingSchedule;
   private visitingDistribution: VisitingDistribution;
-  private reannealCriteria: ReannealCriteria;
 
   public getSymbolname(deleteCache = false): string {
     if (deleteCache) {
@@ -155,14 +154,6 @@ export class SAOptimizer implements Optimizer {
         break;
       default:
         throw new Error(`unknown acceptance criteria : ${this.args.saAcceptCriteria}`);
-    }
-
-    switch (this.args.saReannealStrategy) {
-      case "none":
-        this.reannealCriteria = makeNoOpReannealCriteria();
-        break;
-      default:
-        throw new Error(`unknown reanneal strategy : ${this.args.saReannealStrategy}`);
     }
   }
 
@@ -306,7 +297,10 @@ export class SAOptimizer implements Optimizer {
       const numBatches = 31;
       let ratioString = "";
       let numEvals = 0;
-      let temperatureIndex = 0;
+      let annealingIndex = 0;
+      let currentAnnealingCycleThreshold = 1000;
+      let currentAnnealingCycleNumAccepted = 0;
+      let epochsSinceLastBestImprovement = 0;
 
       const optimistaionStartDate = Date.now();
       let accumulatedTimeSpentByMeasuring = 0;
@@ -331,7 +325,8 @@ export class SAOptimizer implements Optimizer {
       // Actual optimization loop starts here.
       const intervalHandle = setInterval(() => {
         Logger.log(`sa: new round ${numEvals}`);
-        let temperature = this.coolingSchedule(temperatureIndex);
+        let temperature = this.coolingSchedule(annealingIndex);
+
         if (Math.sign(temperature) < 0) errorOut({ exitCode: 123, msg: "negative temperature" });
 
         // Always save current state before sampling.
@@ -409,13 +404,21 @@ export class SAOptimizer implements Optimizer {
           candidates[CURRENT_FUNCTION].stacklength = candidates[CANDIDATE_FUNCTION].stacklength;
           candidates[CURRENT_FUNCTION].length = candidates[CANDIDATE_FUNCTION].length;
           this.no_of_instructions = candidates[CANDIDATE_FUNCTION].length;
+          currentAnnealingCycleNumAccepted++;
           wasBest = updateBestState(
             candidates[CURRENT_FUNCTION].asm,
             meanrawCandidate,
             numEvals,
             meanrawCheck / meanrawCandidate,
           );
+          if (wasBest) {
+            Model.saveSnaphot("best");
+            epochsSinceLastBestImprovement = 0;
+          } else {
+            epochsSinceLastBestImprovement++;
+          }
         } else {
+          Logger.log("rejected mutation");
           // revert
           kept = false;
           // Pop back to previous model state.
@@ -473,12 +476,35 @@ export class SAOptimizer implements Optimizer {
 
         // Increase  Number of evaluations taken.
         numEvals++;
-        // Also the temperature index
-        temperatureIndex++;
+        // Also the annealing index
+        annealingIndex++;
 
-        const shouldReanneal = this.reannealCriteria();
+        const shouldReanneal = (() => {
+          switch (this.args.saReannealStrategy) {
+            case "none":
+              return false;
+            case "accepted-100":
+              return currentAnnealingCycleNumAccepted >= 100;
+            case "accepted-1000":
+              return currentAnnealingCycleNumAccepted >= 1000;
+            case "best-500":
+              return epochsSinceLastBestImprovement >= 500;
+            case "custom":
+              if (annealingIndex < currentAnnealingCycleThreshold) return false;
+              return epochsSinceLastBestImprovement >= 500;
+          }
+          return false;
+        })();
+
         if (shouldReanneal) {
-          // Do nothing for now.
+          Logger.log("sa: reannealing");
+          annealingIndex = 0;
+          epochsSinceLastBestImprovement = 0;
+          currentAnnealingCycleThreshold *= 1.5;
+          currentAnnealingCycleNumAccepted = 0;
+          if (this.args.saReannealReset) {
+            Model.restoreSnapshot("best");
+          }
         }
 
         if (numEvals >= this.args.evals) {

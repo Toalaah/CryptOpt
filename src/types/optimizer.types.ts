@@ -58,6 +58,7 @@ export type OptimizerArgs = {
   saVisitingDistribution: SA_VISITING_DISTRIBUTION_T;
   saAcceptCriteria: SA_ACCEPT_CRITERIA_T;
   saReannealStrategy: SA_REANNEAL_STRATEGY_T;
+  saReannealReset: boolean;
   // END SA optimizer params.
 };
 export type ParsedArgsT = OptimizerArgs & {

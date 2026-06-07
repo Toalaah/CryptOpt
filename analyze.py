@@ -26,6 +26,7 @@ class Run:
     visiting_distribution: int = 0
     accept_criteria: int = 0
     reanneal_strategy: int = 0
+    reanneal_reset: bool = True
     best_state_epoch: int = 0
     step_size_avg: float = 0.0
     step_size_max: int = 0
@@ -51,6 +52,7 @@ class Run:
             self.visiting_distribution = d["saVisitingDistribution"]
             self.accept_criteria = d["saAcceptCriteria"]
             self.reanneal_strategy = d["saReannealStrategy"]
+            self.reanneal_reset = d["saReannealReset"]
         csv_files = list(self.dir.rglob("*.csv"))
         assert len(csv_files) == 1
         mutation_log = csv_files[0]
@@ -136,6 +138,7 @@ if __name__ == "__main__":
                 "saCoolingSchedule",
                 "saInitialTemperature",
                 "saReannealStrategy",
+                "saReannealReset",
                 "saVisitingDistribution",
                 "saAcceptCriteria",
                 "bestStateEpoch",
@@ -160,6 +163,7 @@ if __name__ == "__main__":
                     run.coolinig_schedule,
                     run.initial_temperature,
                     run.reanneal_strategy,
+                    run.reanneal_reset,
                     run.visiting_distribution,
                     run.accept_criteria,
                     run.best_state_epoch,

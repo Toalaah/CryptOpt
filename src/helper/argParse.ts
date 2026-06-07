@@ -124,6 +124,11 @@ export const parsedArgs = y
     describe: "Reannealing strategy to use (has no effect if optimizer is not set to 'sa').",
     choices: SA_REANNEAL_STRATEGIES,
   })
+  .option("saReannealReset", {
+    boolean: true,
+    default: true,
+    describe: "Whether reannealing should also reset position to last best solution.",
+  })
   // END SA optimizer params.
   .option("bridge", {
     string: true,

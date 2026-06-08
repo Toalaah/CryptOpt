@@ -121,7 +121,7 @@ export class SAOptimizer implements Optimizer {
         this.visitingDistribution = makeCauchyVisitingDistribution(this.args.saStepSizeParam);
         break;
       case "uniform":
-        this.visitingDistribution = makeUniformVisitingDistribution(0.05);
+        this.visitingDistribution = makeUniformVisitingDistribution(this.args.saStepSizeParam);
         break;
       case "const-1":
         this.visitingDistribution = makeConstVisitingDistribution(1);

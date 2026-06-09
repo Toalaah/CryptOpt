@@ -325,7 +325,8 @@ export class SAOptimizer implements Optimizer {
       // Actual optimization loop starts here.
       const intervalHandle = setInterval(() => {
         Logger.log(`sa: new round ${numEvals}`);
-        let temperature = this.coolingSchedule(annealingIndex);
+        const tempIndex = annealingIndex * this.args.saCoolingParam;
+        let temperature = this.coolingSchedule(tempIndex);
 
         if (Math.sign(temperature) < 0) errorOut({ exitCode: 123, msg: "negative temperature" });
 
@@ -726,10 +727,4 @@ function makeMetropolisAcceptanceCriteria(_: number): AcceptCriteria {
     const u = Paul.uniform();
     return u <= pr;
   };
-}
-
-type ReannealCriteria = () => boolean;
-
-function makeNoOpReannealCriteria(): ReannealCriteria {
-  return () => false;
 }

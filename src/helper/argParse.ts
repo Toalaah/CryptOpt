@@ -98,7 +98,7 @@ export const parsedArgs = y
     default: 1,
     min: Number.EPSILON,
     describe:
-      "Stretches out cooling rate. Higher values decrease the rate of cooling by the specified factor.",
+      "Stretches out cooling rate. Higher values increases the rate of cooling by the specified factor.",
   })
   .option("saVisitingDistribution", {
     string: true,

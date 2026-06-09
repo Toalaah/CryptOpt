@@ -49,6 +49,7 @@ export function getTestArgs(filename: string): OptimizerArgs {
     saVisitingDistribution: "gaussian",
     saAcceptCriteria: "metropolis",
     saReannealStrategy: "none",
+    saReannealReset: false,
     evals: 1,
     seed: 11, //Date.now(),
     cyclegoal: 100,

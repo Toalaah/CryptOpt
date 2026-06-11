@@ -21,10 +21,12 @@ class Run:
     evals: int = 0
     seed: str = ""
     optimizer: str = ""
-    coolinig_schedule: int = 0
+    cooling_schedule: int = 0
     initial_temperature: int = 0
     visiting_distribution: int = 0
     accept_criteria: int = 0
+    cooling_param: int = 1
+    step_size_param: int = 1
     reanneal_strategy: int = 0
     reanneal_reset: bool = True
     best_state_epoch: int = 0
@@ -47,10 +49,12 @@ class Run:
             self.best_state_epoch = self.evals
             self.seed = d["seed"]
             self.optimizer = d["optimizer"]
-            self.coolinig_schedule = d["saCoolingSchedule"]
+            self.cooling_schedule = d["saCoolingSchedule"]
             self.initial_temperature = d["saInitialTemperature"]
             self.visiting_distribution = d["saVisitingDistribution"]
             self.accept_criteria = d["saAcceptCriteria"]
+            self.cooling_param = d["saCoolingParam"]
+            self.step_size_param = d["saStepSizeParam"]
             self.reanneal_strategy = d["saReannealStrategy"]
             self.reanneal_reset = d["saReannealReset"]
         csv_files = list(self.dir.rglob("*.csv"))
@@ -136,12 +140,14 @@ if __name__ == "__main__":
                 "seed",
                 "optimizer",
                 "saCoolingSchedule",
+                "saCoolingParam",
                 "saInitialTemperature",
                 "saReannealStrategy",
                 "saReannealReset",
                 "saVisitingDistribution",
                 "saAcceptCriteria",
                 "bestStateEpoch",
+                "saStepSizeParam"
                 "stepSizeAvg",
                 "stepSizeMax",
                 "cyclesOpt",
@@ -160,13 +166,15 @@ if __name__ == "__main__":
                     run.evals,
                     run.seed,
                     run.optimizer,
-                    run.coolinig_schedule,
+                    run.cooling_schedule,
+                    run.cooling_param,
                     run.initial_temperature,
                     run.reanneal_strategy,
                     run.reanneal_reset,
                     run.visiting_distribution,
                     run.accept_criteria,
                     run.best_state_epoch,
+                    run.step_size_param,
                     run.step_size_avg,
                     run.step_size_max,
                     cycles_opt,

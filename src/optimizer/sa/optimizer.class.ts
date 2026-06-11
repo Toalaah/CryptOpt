@@ -724,6 +724,7 @@ function makeMetropolisAcceptanceCriteria(_: number): AcceptCriteria {
     }
     const energyDelta = energyVisit - energyCurrent;
     const pr = Math.min(1, Math.exp(-energyDelta / temperature));
+    Logger.log(`sa: accepting delta ${energyDelta} with prob ${pr} at temp ${temperature}`);
     const u = Paul.uniform();
     return u <= pr;
   };

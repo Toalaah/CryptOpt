@@ -717,13 +717,13 @@ function makeRandAcceptanceCriteria(_: number): AcceptCriteria {
 }
 
 // Metropolis-hastings criteria.
-function makeMetropolisAcceptanceCriteria(_: number): AcceptCriteria {
+function makeMetropolisAcceptanceCriteria(acceptParam: number): AcceptCriteria {
   return (energyCurrent: number, energyVisit: number, temperature: number) => {
     if (energyVisit <= energyCurrent) {
       return true;
     }
     const energyDelta = energyVisit - energyCurrent;
-    const pr = Math.min(1, Math.exp(-energyDelta / temperature));
+    const pr = Math.min(1, Math.exp(-energyDelta / (temperature * acceptParam)));
     Logger.log(`sa: accepting delta ${energyDelta} with prob ${pr} at temp ${temperature}`);
     const u = Paul.uniform();
     return u <= pr;

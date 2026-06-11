@@ -70,13 +70,13 @@ export const parsedArgs = y
   // START SA optimizer params.
   .option("saInitialTemperature", {
     number: true,
-    default: 100,
+    default: 500,
     min: 0,
     describe: "Initial annealing temperature to use (has no effect if optimizer is not set to 'sa').",
   })
   .option("saStepSizeParam", {
     number: true,
-    default: 0.2,
+    default: 0.04,
     min: Number.EPSILON,
     describe:
       "Controls the visit parameter tuning the scale of the visiting distribution (has no effect if optimizer is not set to 'sa').",

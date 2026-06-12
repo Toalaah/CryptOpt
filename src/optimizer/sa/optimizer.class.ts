@@ -673,7 +673,7 @@ function makeGaussianVisitingDistribution(stepSizeParam: number): VisitingDistri
     let n = Paul.sampleGaussian(0, stepSizeParam * temperature); // Sample from normal distribution centered at 0 with scale controlled by step size.
     n = Math.abs(n); // Make positive.
     n = Math.round(n); // Round to nearest integer (we can only take discrete mutation step sizes).
-    n = 1 + n;
+    n = Math.max(1, n); // Ensure at least one step.
     return n;
   };
 }
@@ -683,7 +683,7 @@ function makeCauchyVisitingDistribution(stepSizeParam: number): VisitingDistribu
     let n = Paul.sampleCauchy(0, stepSizeParam * temperature); // Sample from cauchy distribution centered at 0 with scale controlled by step size.
     n = Math.abs(n); // Make positive.
     n = Math.round(n); // Round to nearest integer (we can only take discrete mutation step sizes).
-    n = 1 + n; // Ensure at least one step.
+    n = Math.max(1, n); // Ensure at least one step.
     return n;
   };
 }
